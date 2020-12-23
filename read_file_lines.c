@@ -8,19 +8,17 @@
 #include <unistd.h>    // for read()
 #include <errno.h>     // for strerror()
 
+#include "read_file_lines.h"
 
-unsigned bufflen = 2048;
 
-typedef int bool;
-
-typedef bool (*line_user)(const char *start, const char *end, void *closure);
+unsigned RFL_bufflen = 2048;
 
 /**
  * Returns 0 for success, the errno value if it fails.
  */
 int read_file_lines(int fh, line_user user, void *closure)
 {
-   char buffer[bufflen];
+   char buffer[RFL_bufflen];
    char *buffend = buffer + sizeof(buffer);
 
    char *start_read = buffer;   // memory position at which next read begins
@@ -165,7 +163,7 @@ const char *filename = "read_file_lines.test";
 
 raAction actions[] = {
    {'h', "help", "Help screen", &ra_show_help_agent },
-   {'b', "bufflen", "Length of line-reading buffer", &ra_int_agent, &bufflen },
+   {'b', "bufflen", "Length of line-reading buffer", &ra_int_agent, &RFL_bufflen },
    {'f', "file", "File to read", &ra_string_agent, &filename }
 };
 
