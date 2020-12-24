@@ -19,4 +19,15 @@ line.  In EMACS, compile with `M-x compile`.
   This guide should help me remember effective coding
   techniques.
 
+- [Line-reading Function](README_read_file_lines.md)
+  Collecting data from various sources usually requires processing
+  files by line.  The main function, `read_file_lines` buffers
+  the contents of a file and invokes a callback function to
+  present a line to be processed.
+
+- commaize  
+  This function, found in *commaize.c*, uses recursion to
+  break up a number from the small-end and displays it when
+  the recursion unwinds.
+
 
