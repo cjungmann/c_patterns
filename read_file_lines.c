@@ -73,8 +73,10 @@ int read_handle_lines(int fh, line_user user, void *closure)
 
          if (end_line)
          {
-            if (!(*user)(start_line, end_line, closure) || ptr >= end_read)
+            if (!(*user)(start_line, end_line, closure))
                goto abandon_function;
+            else if (ptr >= end_read)
+               break;
             else
             {
                start_line = next_line;
