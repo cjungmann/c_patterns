@@ -10,7 +10,8 @@ typedef int bool;
 
 typedef bool (*line_user)(const char *start, const char *end, void *closure);
 
-int read_file_lines(int fh, line_user user, void *closure);
+int read_handle_lines(int fh, line_user user, void *closure);
+int read_file_lines(const char *filepath, line_user user, void *closure);
 
 
 #endif
