@@ -75,12 +75,16 @@ int read_handle_lines(int fh, line_user user, void *closure)
          {
             if (!(*user)(start_line, end_line, closure))
                goto abandon_function;
-            else if (ptr >= end_read)
-               break;
             else
             {
-               start_line = next_line;
                end_line = NULL;
+               if (next_line >= buffer && next_line < end_read)
+                  start_line = next_line;
+               else
+               {
+                  start_line = end_read;
+                  break;
+               }
             }
          }
       }
@@ -89,12 +93,16 @@ int read_handle_lines(int fh, line_user user, void *closure)
 
       // measure length of the incomplete line
       int move_bytes = end_read - start_line;
-      // copy incomplete line beginning of the buffer
-      memcpy(buffer, start_line, move_bytes);
-      // prepare to read file to byte following incomplete line
-      start_read = buffer + move_bytes;
 
-      end_line = buffer + move_bytes;
+      if (move_bytes)
+      {
+         // copy incomplete line beginning of the buffer
+         memcpy(buffer, start_line, move_bytes);
+         // prepare to read file to byte following incomplete line
+         start_read = end_line = buffer + move_bytes;
+      }
+      else
+         start_read = end_line = buffer;
    }
 
    if (end_line > buffer)
