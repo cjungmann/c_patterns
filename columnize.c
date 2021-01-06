@@ -7,7 +7,11 @@
 #include <termios.h>
 #include <unistd.h>
 
-typedef void (*flow_function_f)(const char **start, const char **end, int gutter, int max_columns);
+typedef const char ** (*flow_function_f)(const char **start,
+                                         const char **end,
+                                         int gutter,
+                                         int max_columns,
+                                         int max_lines);
 
 
 /*
@@ -111,8 +115,14 @@ void pad_write_string(const char *str, int maxlen)
 
 /**
  * Flow columnar data top-to-bottom before moving to next column to the right.
+ *
+ * The function returns a pointer to the string following the last printed string.
  */
-void display_newspaper_columns(const char **start, const char **end, int gutter, int max_columns)
+const char ** display_newspaper_columns(const char **start,
+                                        const char **end,
+                                        int gutter,
+                                        int max_columns,
+                                        int max_lines)
 {
    int wide, tall;
    get_screen_length(&wide, &tall);
@@ -130,10 +140,19 @@ void display_newspaper_columns(const char **start, const char **end, int gutter,
    if (count % columns)
       ++lines;
 
+   // Copy *end* in case a line limit also limits strings to print
+   const char **stop = end;
+
+   if (max_lines && max_lines < lines)
+   {
+      lines = max_lines;
+      stop = start + ( lines * columns );
+   }
+
    const char **anchor_line = start;
    const char **ptr = start;
 
-   while (ptr < end)
+   while (ptr < stop)
    {
       pad_write_string(*ptr, colwidth);
 
@@ -141,7 +160,7 @@ void display_newspaper_columns(const char **start, const char **end, int gutter,
       ptr += lines;
 
       // If calcluated neighboring string is out-of-range,
-      if (ptr >= end)
+      if (ptr >= stop)
       {
          // Return pointer to string that belongs in left-most column,
          ptr = ++anchor_line;
@@ -155,12 +174,20 @@ void display_newspaper_columns(const char **start, const char **end, int gutter,
    }
    
    printf("\n");
+
+   return stop;
 }
 
 /**
  * Flow columnar data left-to-right before moving down to next line.
+ *
+ * The function returns a pointer to the string following the last printed string.
  */
-void display_parallel_columns(const char **start, const char **end, int gutter, int max_columns)
+const char ** display_parallel_columns(const char **start,
+                                       const char **end,
+                                       int gutter,
+                                       int max_columns,
+                                       int max_lines)
 {
    int wide, tall;
    get_screen_length(&wide, &tall);
@@ -180,8 +207,17 @@ void display_parallel_columns(const char **start, const char **end, int gutter, 
    if (count % columns)
       ++lines;
 
+   // Copy *end* in case a line limit also limits strings to print
+   const char **stop = end;
+
+   if (max_lines && max_lines < lines)
+   {
+      lines = max_lines;
+      stop = start + ( lines * columns );
+   }
+
    int column = 0;
-   while (ptr < end)
+   while (ptr < stop)
    {
       pad_write_string(*ptr, colwidth);
 
@@ -193,6 +229,8 @@ void display_parallel_columns(const char **start, const char **end, int gutter, 
    }
 
    printf("\n");
+
+   return stop;
 }
 
 // Custom readargs agent to set flow function
@@ -246,19 +284,20 @@ int gutter = 3;
 int max_columns = 0;
 int show_format_demo = 0;
 int show_screen_specs = 0;
+int max_lines = 0;
 const char **first_string = NULL;
 flow_function_f flow_function = display_newspaper_columns;
 
 raAction actions[] = {
    {'h', "help", "This help display", &ra_show_help_agent },
+   {'c', "columns", "Upper limit of columns to display", &ra_int_agent, &max_columns},
+   {'f', "flow", "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent, &flow_function},
    {'g', "gutter", "Minimum spaces between columns", &ra_int_agent, &gutter},
-   {'m', "max_columns", "Upper limit of columns to display", &ra_int_agent, &max_columns},
+   {'l', "lines", "Line limit per \"page.\"", &ra_int_agent, &max_lines},
    {'s', "show values", "Show set values.", &ra_show_values_agent },
    {'d', NULL, "Show string formatting demo.", &ra_flag_agent, &show_format_demo },
    {'S', NULL, "Show screen specs.", &ra_flag_agent, &show_screen_specs },
-   {-1,  "*list_start", "First string of list", &findarg_agent, &first_string },
-
-   {'f', "flow", "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent, &flow_function}
+   {-1,  "*list_start", "First string of list", &findarg_agent, &first_string }
 };
    
 int main(int argc, const char **argv)
@@ -292,7 +331,14 @@ int main(int argc, const char **argv)
       }
 
       if (first_string)
-         (*flow_function)(first_string, end, gutter, max_columns);
+      {
+         const char **top = first_string;
+         while (top < end)
+         {
+            const char **stop = (*flow_function)(top, end, gutter, max_columns, max_lines);
+            top = stop;
+         }
+      }
 
       /* display_parallel_columns(first_string end, gutter, max_columns); */
       /* display_newspaper_columns(first_string, end, gutter, max_columns); */
