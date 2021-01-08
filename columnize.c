@@ -23,6 +23,29 @@ void get_screen_dimensions(int *wide, int *tall)
    *tall = ws.ws_row;
 }
 
+/*
+ * Return the word count and size of the longest string
+ * in pointer arguments *count* and *maxlen* to predict
+ * the number of rows and columns can be displayed.
+ */
+void tabulate(const char **start, const char **end, int *count, int *maxlen)
+{
+   *count = *maxlen = 0;
+
+   const char **ptr = start;
+   size_t curlen;
+   while (ptr < end)
+   {
+      curlen = strlen(*ptr);
+
+      ++*count;
+      if (*maxlen < curlen)
+         *maxlen = curlen;
+
+      ++ptr;
+   }
+}
+
 /**
  * Flow columnar data top-to-bottom before moving to next column to the right.
  *
@@ -203,29 +226,6 @@ void demo_string_formatting(void)
    printf("\n");
    
 
-}
-
-/*
- * Return the word count and size of the longest string
- * in pointer arguments *count* and *maxlen* to predict
- * the number of rows and columns can be displayed.
- */
-void tabulate(const char **start, const char **end, int *count, int *maxlen)
-{
-   *count = *maxlen = 0;
-
-   const char **ptr = start;
-   size_t curlen;
-   while (ptr < end)
-   {
-      curlen = strlen(*ptr);
-
-      ++*count;
-      if (*maxlen < curlen)
-         *maxlen = curlen;
-
-      ++ptr;
-   }
 }
 
 /*
