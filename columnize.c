@@ -318,7 +318,7 @@ flow_function_f flow_function = display_newspaper_columns;
 
 raAction actions[] = {
    {'h', "help",        "This help display",                       &ra_show_help_agent },
-   {'s', "show values", "Show set values.",                        &ra_show_values_agent },
+   {'s', "show_values", "Show set values.",                        &ra_show_values_agent },
 
    {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &max_columns},
    {'f', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &flow_function},
