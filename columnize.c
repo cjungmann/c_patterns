@@ -7,110 +7,20 @@
 #include <termios.h>
 #include <unistd.h>
 
-typedef const char ** (*flow_function_f)(const char **start,
-                                         const char **end,
-                                         int gutter,
-                                         int max_columns,
-                                         int max_lines);
-
+#include "columnize.h"
 
 /*
- * There are two styles of columnar output:
- * - "Newspaper style" with consecutive strings are below each other in
- *   each column:
- *
- *   1  4  7
- *   2  5  8
- *   3  6  9
- *
- * - "Parallel style" where consecutive strings are added to the right:
- *
- *   1  2  3
- *   4  5  6
- *   7  8  9
- *
- * In addition to code to print a set of strings in columns, this
- * code also includes:
-
- * - Explains formatting printf output for a string "%*s", "%.*s"
- *   Refer to function `pad_write_string` and `demo_string_formatting`.
- *
- * - A custom *readargs* agent. Refer to `findarg_reader()`, `findarg_writer()`,
- *   the agent definition following the two functions, and the *list_start raAction
- *   in the action map.
- *
+ * Use simple ioctl function to query the screen size in
+ * characters.  Return the dimensions in pointer arguments
+ * *wide* and *tall*.
  */
-
-
-void tabulate(const char **start, const char **end, int *count, int *maxlen)
-{
-   *count = *maxlen = 0;
-
-   const char **ptr = start;
-   size_t curlen;
-   while (ptr < end)
-   {
-      curlen = strlen(*ptr);
-
-      ++*count;
-      if (*maxlen < curlen)
-         *maxlen = curlen;
-
-      ++ptr;
-   }
-}
-
-void get_screen_length(int *wide, int *tall)
+void get_screen_dimensions(int *wide, int *tall)
 {
    // Refer to *man* pages 'ioctl' and 'ioctl_tty'
    struct winsize ws;
    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
    *wide = ws.ws_col;
    *tall = ws.ws_row;
-}
-
-void demo_string_formatting(void)
-{
-   /*
-    * Refer to `man 3 printf` and search for "Format of the format string"
-    *
-    * You can print a substring by using the *field width* and *field precision*
-    * settings of a %s formatting token.  These are the string behaviors of formatting
-    * instructions that may be more familiar for printing float/double values,
-    * where the *width* is the entire length of the output, and the *precision*
-    * says how many numerals can follow the decimal.
-    */
-
-   printf("Printing 10 spaces with \"%%*s\" formatting:\n");
-   printf("This is using the *width* format instruction.\n");
-   printf("->%*s<-\n", 10, "");
-   printf("\n");
-
-   printf("Print only the first 5 letters of string \"1234567890\" with \"%%.*s\"\n");
-   printf("This is using the *precision* format instruction.\n");
-   printf("%.*s\n", 5, "1234567890");
-
-   printf("\n");
-   printf("Use these variable string output behaviors to add padding before or\n");
-   printf("after a string, as the main columnar output does.\n");
-          
-   printf("\n");
-   printf("This example prints a substring string in a right-justified fixed 10 character cell.\n");
-   printf("That means we add padding before the string:\n");
-   printf("printf(\"%%*s%%.*s\", 5, \"\", 5, \"1234567890\");\n");
-   printf("%*s%.*s\n", 5, "", 5, "1234567890");
-
-   printf("\n");
-   printf("This example prints a substring string in a left-justified fixed 10 character cell.\n");
-   printf("That means we add padding after the string:\n");
-   printf("printf(\"%%.*s%%*s<-\", 5, \"1234567890\", 5, \"\");\n");
-   printf("%.*s%*s<-\n", 5, "1234567890", 5, "");
-}
-
-void pad_write_string(const char *str, int maxlen)
-{
-   int curlen = strlen(str);
-   printf("%s%*.s", str, maxlen - curlen, "");
 }
 
 /**
@@ -125,7 +35,7 @@ const char ** display_newspaper_columns(const char **start,
                                         int max_lines)
 {
    int wide, tall;
-   get_screen_length(&wide, &tall);
+   get_screen_dimensions(&wide, &tall);
 
    int count, maxlen;
    tabulate(start, end, &count, &maxlen);
@@ -154,7 +64,7 @@ const char ** display_newspaper_columns(const char **start,
 
    while (ptr < stop)
    {
-      pad_write_string(*ptr, colwidth);
+      printf("%-*s", colwidth, *ptr);
 
       // skip ahead to neighboring string
       ptr += lines;
@@ -190,7 +100,7 @@ const char ** display_parallel_columns(const char **start,
                                        int max_lines)
 {
    int wide, tall;
-   get_screen_length(&wide, &tall);
+   get_screen_dimensions(&wide, &tall);
 
    int count, maxlen;
    tabulate(start, end, &count, &maxlen);
@@ -219,7 +129,7 @@ const char ** display_parallel_columns(const char **start,
    int column = 0;
    while (ptr < stop)
    {
-      pad_write_string(*ptr, colwidth);
+      printf("%-*s", colwidth, *ptr);
 
       column = ((column+1) % columns);
       if (!column)
@@ -232,6 +142,108 @@ const char ** display_parallel_columns(const char **start,
 
    return stop;
 }
+
+#ifdef COLUMNIZE_MAIN
+
+typedef const char ** (*flow_function_f)(const char **start,
+                                         const char **end,
+                                         int gutter,
+                                         int max_columns,
+                                         int max_lines);
+
+/*
+ * The following code is included to illustrate the ideas I'm exploring
+ * with this code.  The demonstration code will only be compiled when
+ * using EMACS `M-x compile` with this being the current buffer, so the
+ * files *columnize.h* and *columnize.c* can be included in other
+ * projects without polluting those projects with demonstration code.
+ */
+
+void demo_string_formatting(void)
+{
+   /*
+    * Refer to `man 3 printf` and search for "Format of the format string"
+    *
+    * You can print a substring by using the *field width* and *field precision*
+    * settings of a %s formatting token.  These are the string behaviors of formatting
+    * instructions that may be more familiar for printing float/double values,
+    * where the *width* is the entire length of the output, and the *precision*
+    * says how many numerals can follow the decimal.
+    */
+
+   printf("In the following examples, each example line begins\n"
+          "with the conversion specifier that creates the output\n"
+          "that follows the specifier.\n" );
+
+   printf("Formatting results of float value 12345.09876.\n");
+   printf("%%12.5f: ->%12.5f<-\n", 12345.09876);
+   printf("%%.12f:  ->%.12f<-\n", 12345.09876);
+   printf("%%5.f:   ->%5.f<-\n", 12345.09876);
+
+   printf("\n");
+
+   printf("Using the same value, use variable field width and\n"
+          "precision values.\n");
+
+   printf("%%*.f:  ->%*.f<-\n", 3, 12345.09876);
+   printf("%%*.*f: ->%*.*f<-\n", 3, 3, 12345.09876);
+
+   printf("\n");
+
+   printf("Formatting results of string value abcdefghij.\n");
+   printf("%%5.5s: ->%5.5s<-\n", "abcdefghij");
+   printf("%%.5s:  ->%.5s<-\n", "abcdefghij");
+   printf("%%5s:   ->%5s<-\n", "abcdefghij");
+   printf("%%5.s:  ->%5.s<-\n", "abcdefghij");
+   printf("NOTE the lastline of the output is surprising.\n"
+          "Unlike the numeric specifier \"%%5.f\" prints 5 characters,\n"
+          "using \"%%5.s\" prints empty spaces instead of the contents\n"
+          "of the string, while \"%%5s\" prints the string.\n");
+
+   printf("\n");
+   
+
+}
+
+/*
+ * Return the word count and size of the longest string
+ * in pointer arguments *count* and *maxlen* to predict
+ * the number of rows and columns can be displayed.
+ */
+void tabulate(const char **start, const char **end, int *count, int *maxlen)
+{
+   *count = *maxlen = 0;
+
+   const char **ptr = start;
+   size_t curlen;
+   while (ptr < end)
+   {
+      curlen = strlen(*ptr);
+
+      ++*count;
+      if (*maxlen < curlen)
+         *maxlen = curlen;
+
+      ++ptr;
+   }
+}
+
+/*
+ * Code to implement custom *readargs* agents.
+ *
+ * A *reader* function is required.  The *reader* function responds
+ * to a command line argument by saving it or changing a setting.
+ *
+ * A *writer* function is optional and is only used by the
+ * *readargs* agent `ra_show_values_agent` to inform the user
+ * what is the current setting backed by the *raAction* entry.
+ */
+
+/*
+ * Custom *readargs* agent *flow_agent* will change the
+ * value of a function pointer used to display an array
+ * of strings.
+ */
 
 // Custom readargs agent to set flow function
 raStatus flow_reader(const raAction *act, const char *str, raTour *tour)
@@ -258,7 +270,26 @@ void flow_writer(FILE *f, const raAction *act)
       fprintf(f, "undefined flow");
 }
 
+/* The agent needs the value following the option, thus the
+ * first element of the agent is 1.
+ */
 const raAgent flow_agent = { 1, flow_reader, flow_writer };
+
+/*
+ * The following custom *readargs* agent is unusual because
+ * it only identifies the first non-option argument that will
+ * be used as the first element for the columnar output.
+ *
+ * The demo program depends on all option arguments preceding
+ * the first data argument.  Knowing that, this agent omits a
+ * *writer* function because when the *ra_show_values_agent*
+ * agent would be triggered, this value will not yet have been
+ * determined.
+ * 
+ * This function is ususual because it uses a triple-pointer
+ * to set the value of a double-pointer (pointer to array of
+ * string pointers).
+ */
 
 // Custom readargs agent to identify the first string
 raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
@@ -272,14 +303,11 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
    return RA_SUCCESS;
 }
 
-// There is not writer function for findarg_agent.
-// A writer function will never have a useful value for
-// ra_show_values_agent because the first argument necessarily
-// follows all program options, the parsing of which might
-// trigger ra_show_values_agent.
-
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
+/*
+ * State variables to be handled with *readargs*
+ */
 int gutter = 3;
 int max_columns = 0;
 int show_format_demo = 0;
@@ -289,15 +317,16 @@ const char **first_string = NULL;
 flow_function_f flow_function = display_newspaper_columns;
 
 raAction actions[] = {
-   {'h', "help", "This help display", &ra_show_help_agent },
-   {'c', "columns", "Upper limit of columns to display", &ra_int_agent, &max_columns},
-   {'f', "flow", "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent, &flow_function},
-   {'g', "gutter", "Minimum spaces between columns", &ra_int_agent, &gutter},
-   {'l', "lines", "Line limit per \"page.\"", &ra_int_agent, &max_lines},
-   {'s', "show values", "Show set values.", &ra_show_values_agent },
-   {'d', NULL, "Show string formatting demo.", &ra_flag_agent, &show_format_demo },
-   {'S', NULL, "Show screen specs.", &ra_flag_agent, &show_screen_specs },
-   {-1,  "*list_start", "First string of list", &findarg_agent, &first_string }
+   {'h', "help",        "This help display",                       &ra_show_help_agent },
+   {'s', "show values", "Show set values.",                        &ra_show_values_agent },
+
+   {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &max_columns},
+   {'f', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &flow_function},
+   {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &gutter},
+   {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &max_lines},
+   {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo },
+   {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs },
+   {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string }
 };
    
 int main(int argc, const char **argv)
@@ -309,7 +338,7 @@ int main(int argc, const char **argv)
    {
       // Collect screen dimensions and list specs
       int wide, tall;
-      get_screen_length(&wide, &tall);
+      get_screen_dimensions(&wide, &tall);
 
       const char **end = argv + argc;
       int count = 0, maxlen = 0;
@@ -347,6 +376,7 @@ int main(int argc, const char **argv)
    return 0;
 }
 
+#endif
 
 /* Local Variables: */
 /* compile-command: "b=columnize; \*/
@@ -355,3 +385,4 @@ int main(int argc, const char **argv)
 /*  -lreadargs                    \*/
 /*  -D${b^^}_MAIN -o $b ${b}.c"   \*/
 /* End: */
+
