@@ -26,111 +26,125 @@ char arrayify_escape_chars[] = {
 
 const char escapes[] = "nt";
 
-/*
- * This function responds to a backslash-escaped character, and returns
- * indication if the escaped character is a field separator.
- *
- * The function updates pointers to *source* and, if passed in, the
- * sets the *target* value and updates its pointer as well.
- */
-int arrayify_process_escaped_char(char **target, const char **source)
+char arrayify_convert_escaped_char(char c)
 {
-   if (**source == '\\')
+   char *chr = strchr(escapes, c);
+   if (chr)
+      return arrayify_escape_chars[chr - escapes];
+   else
+      return c;
+}
+
+/*
+ * Skip past unescaped or escape-identified IFS characters.
+ * Returns *end* for no normal characters to preserve termination
+ * conditions in arrayify_parser() loop.
+ */
+const char *arrayify_trim_ifs(const char *buffer, const char *end)
+{
+   const char *ptr = buffer;
+   while (ptr < end)
    {
-      // Skip backslash that introduces escaped character
-      ++*source;
-
-      // Recognize if the following character is IFS before it's translated.
-      int is_ifs = arrayify_is_ifs(**source);
-
-      // Attempt to recognize following character
-      char *chr = strchr(escapes, **source);
-      char translated_chr = chr ? arrayify_escape_chars[chr - escapes] : **source;
-
-      // Only copy char if target is available
-      if (*target)
+      if (*ptr == '\\')
       {
-         **target = translated_chr;
-         ++*target;
+         char c = arrayify_convert_escaped_char(*(ptr+1));
+         if (!arrayify_is_ifs(c))
+            return ptr;  // return pointer to the backslash
+         else
+            ++ptr;       // increment past the backslash
       }
+      else if (!arrayify_is_ifs(*ptr))
+         return ptr;
 
-      // Now skip the escaped character
-      ++*source;
-
-      // If escaped character is IFS, we recognize as NON-IFS:
-      if (is_ifs)
-         return 0;
-      else if (arrayify_is_ifs(translated_chr))
-         return 1;
+      ++ptr;
    }
 
-   return 0;
+   return end;
 }
 
 int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
 {
-   int count = 0;
-   char *ptr = buffer;
-   const char *end = buffer + bufflen;
+   // Guardrail for buffer
+   char *end = buffer + bufflen;
+
+   const char *source = arrayify_trim_ifs(buffer, end);
+
+   // Early termination for empty string
+   if (source >= end)
+      return 0;
+
+   // At this point, we have at least one element.
+   int count = 1;
 
    const char **cur_el = els;
    const char **end_el = els + elslen;
 
-   // ignore leading spaces
-   while (arrayify_is_ifs(*ptr) && ptr < end)
-      ++ptr;
-
-   char *target = els ? ptr : NULL;
-   const char *source = ptr;
-
+   // *target* will be used as flag to enable copying
+   char *target = els ? buffer : NULL;
    if (target)
-      *cur_el = ptr;
+      *cur_el = target;
+
+   char prepped_char = 0;
 
    while (source < end)
    {
-      int advance_element = 0;
-
-      // For counting, just ignore characters following a back-slash.
       if (*source == '\\')
-         advance_element = arrayify_process_escaped_char(&target, &source);
-      else if (arrayify_is_ifs(*source))
       {
          ++source;
-         ++count;
 
-         if (target)
-            *target++ = '\0';
+         // (A bit confusing: think about it)
+         // If escaped character is IFS, the escape was intended
+         // to disarm IFS, the keep in current string.
+         if (arrayify_is_ifs(*source))
+            prepped_char = *source;
+         else
+         {
+            prepped_char = arrayify_convert_escaped_char(*source);
 
-         // discard all spaces between elements
-         while (arrayify_is_ifs(*source) && source < end)
-            ++source;
+            // If converted character is IFS, then it was intended
+            // to be interpreted as IFS, mark as end-of-element
+            if (arrayify_is_ifs(prepped_char))
+               prepped_char = '\0';
+         }
+      }
+      else if (arrayify_is_ifs(*source))
+         prepped_char = '\0';
+      else
+         prepped_char = *source;
+
+      ++source;
+
+      if (target)
+      {
+         *target = prepped_char;
+         ++target;
+      }
+
+      // Signal to end the current element:
+      if (prepped_char == '\0')
+      {
+         source = arrayify_trim_ifs(source, end);
 
          if (source < end)
          {
-            if (target)
+            ++count;
+
+            if (els)
             {
                ++cur_el;
-               if (cur_el >= end_el)
-               {
-                  printf("There should be %d elements in the els array.\n", elslen);
-                  printf("Diff between cur_el and els is %ld.\n", cur_el - els);
-                  printf("Diff between cur_el and end_el is %ld.\n", cur_el - end_el);
-               }
-               assert(cur_el < end_el);
-               *cur_el = source;
 
-               target = (char*)source;
+               if (cur_el < end_el)
+                  *cur_el = target;
+               else
+               {
+                  fprintf(stderr, "Attempted arrayify buffer-overrun.\n");
+                  break;
+               }
             }
          }
-      }
-      else if (target)
-         *target++ = *source++;
-      else
-         source++;
+         else
+            break;
 
-      if (advance_element)
-      {
-         ++cur_el;
       }
    }
 
