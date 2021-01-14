@@ -5,6 +5,14 @@
 
 #include <stdio.h>
 
+/*
+ * Includes supporting arrayify_file()
+ */
+#include <fcntl.h>     // for open(), stat()
+#include <sys/stat.h>  // for open(), stat()
+#include <unistd.h>   // for read()
+#include <errno.h>
+
 const char *arrayify_ifs = " \t\n";
 
 void arrayify_set_ifs_from_env(void)
@@ -152,7 +160,7 @@ int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
 }
 
 
-void arrayify_string(char *buffer, int bufflen, arrayify_user user)
+void arrayify_string(char *buffer, int bufflen, arrayify_user_f user, void *closure)
 {
    int count = arrayify_parser(buffer, bufflen, NULL, 0);
    const char *els[count];
@@ -160,59 +168,10 @@ void arrayify_string(char *buffer, int bufflen, arrayify_user user)
 
    arrayify_parser(buffer, bufflen, els, count);
 
-   (*user)(count, (const char**)els);
+   (*user)(count, (const char**)els, closure);
 }
 
-
-
-#ifdef ARRAYIFY_MAIN
-
-#include <stdio.h>
-#include <readargs.h>
-#include <fcntl.h>     // for open(), stat()
-#include <sys/stat.h>  // for open(), stat()
-
-#include <unistd.h>   // for read()
-
-#include <errno.h>
-
-const char *filepath = NULL;
-int show_ifs_flag = 0;
-
-raAction actions[] = {
-   {'h', "help", "This help display", &ra_show_help_agent },
-   {-1, "*file", "File to parse", &ra_string_agent, &filepath },
-   {'I', "show-ifs", "Display IFS", &ra_flag_agent, &show_ifs_flag },
-   {'i', "set-ifs", "Set IFS", &ra_string_agent, &arrayify_ifs }
-};
-
-void show_ifs(void)
-{
-   const char *ptr = arrayify_ifs;
-   int count = 0;
-   while(*ptr)
-   {
-      printf("%d: %d\n", ++count, *ptr);
-      ++ptr;
-   }
-}
-
-int alt_main(int argc, const char **argv)
-{
-   printf("There are %d elements in the array.\n", argc);
-   const char **ptr = argv;
-   const char **end = argv + argc;
-   int index = 0;
-
-   while (ptr < end)
-   {
-      printf("%4d: %s\n", index++, *ptr);
-      ++ptr;
-   }
-   return 0;
-}
-
-int read_file(const char *path)
+int arrayify_file(const char *path, arrayify_user_f user, void *closure)
 {
    struct stat lstat;
    if (stat(path, &lstat) == 0)
@@ -229,14 +188,53 @@ int read_file(const char *path)
                buffer[bytes_read] = '\0';
 
             // Don't include terminating \0 in bytes_read count:
-            arrayify_string(buffer, bytes_read, alt_main);
+            arrayify_string(buffer, bytes_read, user, closure);
          }
       }
    }
-   else
-      fprintf(stderr, "stat on %s failed: %s.\n", path, strerror(errno));
 
    return errno;
+}
+
+
+#ifdef ARRAYIFY_MAIN
+
+#include <stdio.h>
+#include <readargs.h>
+
+const char *filepath = NULL;
+int show_ifs_flag = 0;
+
+raAction actions[] = {
+   {'h', "help", "This help display", &ra_show_help_agent },
+   {'i', "set-ifs", "Set IFS", &ra_string_agent, &arrayify_ifs },
+   {'I', "show-ifs", "Display IFS", &ra_flag_agent, &show_ifs_flag },
+   {-1, "*file", "File to parse", &ra_string_agent, &filepath }
+};
+
+void show_ifs(void)
+{
+   const char *ptr = arrayify_ifs;
+   int count = 0;
+   while(*ptr)
+   {
+      printf("%d: %d\n", ++count, *ptr);
+      ++ptr;
+   }
+}
+
+void alt_main(int argc, const char **argv, void *closure)
+{
+   printf("There are %d elements in the array.\n", argc);
+   const char **ptr = argv;
+   const char **end = argv + argc;
+   int index = 0;
+
+   while (ptr < end)
+   {
+      printf("%4d: %s\n", index++, *ptr);
+      ++ptr;
+   }
 }
 
 int main(int argc, const char **argv)
@@ -249,7 +247,7 @@ int main(int argc, const char **argv)
          show_ifs();
       
       if (filepath)
-         read_file(filepath);
+         arrayify_file(filepath, alt_main, NULL);
       else
          printf("Nothing to do.\n");
    }
