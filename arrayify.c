@@ -173,7 +173,6 @@ void arrayify_string(char *buffer, int bufflen, arrayify_user user)
 #include <sys/stat.h>  // for open(), stat()
 
 #include <unistd.h>   // for read()
-#include <alloca.h>
 
 #include <errno.h>
 
@@ -224,7 +223,7 @@ int read_file(const char *path)
          int fh = open(path, O_RDONLY);
          if (fh)
          {
-            char *buffer = (char*)alloca(size+1);
+            char buffer[size+1];
             unsigned bytes_read = read(fh, buffer, size+1);
             if (bytes_read < size+1)
                buffer[bytes_read] = '\0';
