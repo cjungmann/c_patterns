@@ -168,11 +168,26 @@ const char ** display_parallel_columns(const char **start,
 
 #ifdef COLUMNIZE_MAIN
 
+#include "arrayify.c"
+
 typedef const char ** (*flow_function_f)(const char **start,
                                          const char **end,
                                          int gutter,
                                          int max_columns,
                                          int max_lines);
+
+/*
+ * State variables to be handled with *readargs*
+ */
+int gutter = 3;
+int max_columns = 0;
+int show_format_demo = 0;
+int show_screen_specs = 0;
+int max_lines = 0;
+const char **first_string = NULL;
+const char *strings_file = NULL;
+flow_function_f flow_function = display_newspaper_columns;
+
 
 /*
  * The following code is included to illustrate the ideas I'm exploring
@@ -181,6 +196,16 @@ typedef const char ** (*flow_function_f)(const char **start,
  * files *columnize.h* and *columnize.c* can be included in other
  * projects without polluting those projects with demonstration code.
  */
+
+
+void use_arrayified_string(int argc, const char **argv, void *closure)
+{
+   const char **ptr = argv;
+   const char **end = argv + argc;
+
+   while (ptr < end)
+      ptr = (*flow_function)(ptr, end, gutter, max_columns, max_lines);
+}
 
 void demo_string_formatting(void)
 {
@@ -305,28 +330,21 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
 
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
-/*
- * State variables to be handled with *readargs*
- */
-int gutter = 3;
-int max_columns = 0;
-int show_format_demo = 0;
-int show_screen_specs = 0;
-int max_lines = 0;
-const char **first_string = NULL;
-flow_function_f flow_function = display_newspaper_columns;
 
 raAction actions[] = {
    {'h', "help",        "This help display",                       &ra_show_help_agent },
    {'s', "show_values", "Show set values.",                        &ra_show_values_agent },
 
    {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &max_columns},
-   {'f', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &flow_function},
+   {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &flow_function},
+   {'f', "file",    "File with strings to columnize (set IFS to change delimiters)",
+              &ra_string_agent, &strings_file},
    {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &gutter},
    {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &max_lines},
-   {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo },
-   {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs },
-   {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string }
+   {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &max_lines},
+   {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo},
+   {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs},
+   {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string}
 };
    
 int main(int argc, const char **argv)
@@ -359,7 +377,9 @@ int main(int argc, const char **argv)
                    count, maxlen);
       }
 
-      if (first_string)
+      if (strings_file)
+         arrayify_file(strings_file, use_arrayified_string, NULL);
+      else if (first_string)
       {
          const char **top = first_string;
          while (top < end)
