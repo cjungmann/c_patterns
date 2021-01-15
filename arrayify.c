@@ -13,7 +13,14 @@
 #include <unistd.h>   // for read()
 #include <errno.h>
 
-const char *arrayify_ifs = " \t\n";
+// IFS value used to split strings.  arrayify_prep_ifs() must
+// be called to ensure this variable has at least a default value.
+const char *arrayify_ifs = NULL;
+
+void arrayify_set_ifs(const char *newifs)
+{
+   arrayify_ifs = newifs;
+}
 
 void arrayify_set_ifs_from_env(void)
 {
@@ -22,7 +29,17 @@ void arrayify_set_ifs_from_env(void)
       arrayify_ifs = env;
 }
 
-int arrayify_is_ifs(int chr)
+void arrayify_prep_ifs(void)
+{
+   if (arrayify_ifs == NULL)
+   {
+      arrayify_set_ifs_from_env();
+      if (arrayify_ifs == NULL)
+         arrayify_ifs = " \t\n";
+   }
+}
+
+int arrayify_char_is_ifs(int chr)
 {
    return strchr(arrayify_ifs, chr) != NULL;
 }
@@ -34,6 +51,9 @@ char arrayify_escape_chars[] = {
 
 const char escapes[] = "nt";
 
+/*
+ * Converts escaped IFS chars as well as making IFS chars.
+ */
 char arrayify_convert_escaped_char(char c)
 {
    char *chr = strchr(escapes, c);
@@ -56,12 +76,12 @@ const char *arrayify_trim_ifs(const char *buffer, const char *end)
       if (*ptr == '\\')
       {
          char c = arrayify_convert_escaped_char(*(ptr+1));
-         if (!arrayify_is_ifs(c))
+         if (!arrayify_char_is_ifs(c))
             return ptr;  // return pointer to the backslash
          else
             ++ptr;       // increment past the backslash
       }
-      else if (!arrayify_is_ifs(*ptr))
+      else if (!arrayify_char_is_ifs(*ptr))
          return ptr;
 
       ++ptr;
@@ -70,8 +90,28 @@ const char *arrayify_trim_ifs(const char *buffer, const char *end)
    return end;
 }
 
+/*
+ * Module's main function, used to count detected elements as
+ * well as transforming a string and populating a supplied array.
+ *
+ * The input string, supplied in the *buffer* argument, will be
+ * split at IFS characters in a manner similar to how the shell
+ * splits a string.  It handles escaped characters, but not
+ * parameter expansions.
+ *
+ * If *els* is NULL, then the function only counts the elements.
+ * If *els* IS NOT NULL, it fills the array with pointers to
+ * into *buffer* as it is split upon IFS boundaries.
+ *
+ * The transformation occurs in the supplied buffer, safely done
+ * as the strings can only get shorter with discarded IFS characters
+ * and escaped characters needing less space after transformation.
+ */
 int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
 {
+   // IFS is used to mark element boundaries
+   arrayify_prep_ifs();
+   
    // Guardrail for buffer
    char *end = buffer + bufflen;
 
@@ -103,7 +143,7 @@ int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
          // (A bit confusing: think about it)
          // If escaped character is IFS, the escape was intended
          // to disarm IFS, the keep in current string.
-         if (arrayify_is_ifs(*source))
+         if (arrayify_char_is_ifs(*source))
             prepped_char = *source;
          else
          {
@@ -111,11 +151,11 @@ int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
 
             // If converted character is IFS, then it was intended
             // to be interpreted as IFS, mark as end-of-element
-            if (arrayify_is_ifs(prepped_char))
+            if (arrayify_char_is_ifs(prepped_char))
                prepped_char = '\0';
          }
       }
-      else if (arrayify_is_ifs(*source))
+      else if (arrayify_char_is_ifs(*source))
          prepped_char = '\0';
       else
          prepped_char = *source;
@@ -159,7 +199,13 @@ int arrayify_parser(char *buffer, int bufflen, const char **els, int elslen)
    return count;
 }
 
-
+/**
+ * Parse char* string in *buffer* into an array of char* string elements.
+ * Call *user* callback function with the new array, its length, and the
+ * optional *closure*.
+ *
+ * The *user* callback function takes 
+ */
 void arrayify_string(char *buffer, int bufflen, arrayify_user_f user, void *closure)
 {
    int count = arrayify_parser(buffer, bufflen, NULL, 0);
@@ -171,6 +217,10 @@ void arrayify_string(char *buffer, int bufflen, arrayify_user_f user, void *clos
    (*user)(count, (const char**)els, closure);
 }
 
+/*
+ * Performs several tasks associated with preparing to use
+ * *arrayify_string* with the contents of a disk file.
+ */
 int arrayify_file(const char *path, arrayify_user_f user, void *closure)
 {
    struct stat lstat;
@@ -189,6 +239,8 @@ int arrayify_file(const char *path, arrayify_user_f user, void *closure)
 
             // Don't include terminating \0 in bytes_read count:
             arrayify_string(buffer, bytes_read, user, closure);
+
+            close(fh);
          }
       }
    }
