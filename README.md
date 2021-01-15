@@ -30,4 +30,13 @@ line.  In EMACS, compile with `M-x compile`.
   break up a number from the small-end and displays it when
   the recursion unwinds.
 
+- [Make an array of strings](README_arrayify.md)  
+  This module can break a string into an array of strings,
+  which is then made available through a callback function
+  modeled after main() with a void return type.
+  
+  
+  
+  
+
 
