@@ -361,21 +361,29 @@ void display_columns(int argc, const char **first, void *closure)
          
    while (top < end)
    {
+      // Erase page and move cursor to left-most column
+      printf("\x1b[2J\x1b[1G");
       const char **stop = (*flow_function)(top, end, gutter, columns_to_show, lines_to_show);
+
       if (show_paged_output)
       {
-         printf("\n\nPage %d of %d.  "
-                "'n' for next page, "
-                "'p' for previous page, "
-                "'q' to quit.\n",
+         printf("(%2d/%2d) "
+                "'n' (next page) "
+                "'p' (previous page) "
+                "'q' (quit)",
                 (int)((top - first) / page_capacity) + 1,
                 page_count);
+
+         // Push output without newline
+         fflush(stdout);
+         // Set cursor to column 1 of current line
+         printf("\x1b[1G");
 
          char keybuff[10];
          while (get_keypress(keybuff, sizeof(keybuff)))
          {
             if (*keybuff == 'q')
-               goto abandon_display;
+               goto abandon_keywait;
             else if (*keybuff == 'n')
             {
                // Only break out if more pages remain
@@ -388,7 +396,7 @@ void display_columns(int argc, const char **first, void *closure)
             else if (*keybuff == 'p')
             {
                // Only break out if previous page exists
-               if ((top - first) > page_capacity)
+               if ((top - first) >= page_capacity)
                {
                   top -= page_capacity;
                   break;
@@ -399,9 +407,9 @@ void display_columns(int argc, const char **first, void *closure)
       else
          top = stop;
    }
-
-  abandon_display:
-   ;
+   
+  abandon_keywait:
+   printf("\x1b[2K");
 }
 
 
