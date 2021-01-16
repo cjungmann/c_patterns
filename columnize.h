@@ -19,6 +19,7 @@
  */
 
 void get_screen_dimensions(int *wide, int *tall);
+void tabulate_for_columns(const char **start, const char **end, int *count, int *maxlen);
 
 const char ** display_newspaper_columns(const char **start,
                                         const char **end,
