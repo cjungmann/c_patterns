@@ -149,7 +149,7 @@ void print_char_vals(const char *str)
 
 void test_buff_size(int buffsize)
 {
-   char *buff = (char*)alloca(buffsize);
+   char buff[buffsize];
    int count = 0;
 
    printf(test_prefix);
