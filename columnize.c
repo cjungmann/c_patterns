@@ -28,7 +28,7 @@ void get_screen_dimensions(int *wide, int *tall)
  * in pointer arguments *count* and *maxlen* to predict
  * the number of rows and columns can be displayed.
  */
-void tabulate(const char **start, const char **end, int *count, int *maxlen)
+void tabulate_for_columns(const char **start, const char **end, int *count, int *maxlen)
 {
    *count = *maxlen = 0;
 
@@ -61,7 +61,7 @@ const char ** display_newspaper_columns(const char **start,
    get_screen_dimensions(&wide, &tall);
 
    int count, maxlen;
-   tabulate(start, end, &count, &maxlen);
+   tabulate_for_columns(start, end, &count, &maxlen);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -126,7 +126,7 @@ const char ** display_parallel_columns(const char **start,
    get_screen_dimensions(&wide, &tall);
 
    int count, maxlen;
-   tabulate(start, end, &count, &maxlen);
+   tabulate_for_columns(start, end, &count, &maxlen);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -169,6 +169,7 @@ const char ** display_parallel_columns(const char **start,
 #ifdef COLUMNIZE_MAIN
 
 #include "arrayify.c"
+#include "get_keypress.c"
 
 typedef const char ** (*flow_function_f)(const char **start,
                                          const char **end,
@@ -183,6 +184,7 @@ int gutter = 3;
 int max_columns = 0;
 int show_format_demo = 0;
 int show_screen_specs = 0;
+int show_paged_output = 0;
 int max_lines = 0;
 const char **first_string = NULL;
 const char *strings_file = NULL;
@@ -331,6 +333,78 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 
+void display_columns(int argc, const char **first, void *closure)
+{
+   const char **end = first + argc;
+
+   // Collect screen dimensions and list specs
+   int wide, tall;
+   get_screen_dimensions(&wide, &tall);
+
+   int count = 0, maxlen = 0;
+   tabulate_for_columns(first, end, &count, &maxlen);
+
+   int columns_to_show = wide / ( maxlen + gutter );
+   if ( max_columns && columns_to_show > max_columns )
+      columns_to_show = max_columns;
+
+   // Leave two lines for prompt
+   int lines_to_show = tall - 2;
+   if ( max_lines && lines_to_show > max_lines )
+      lines_to_show = max_lines;
+
+   int page_capacity = columns_to_show * lines_to_show;
+   int items_in_list = (int)(end - first);
+   int page_count = (items_in_list / page_capacity) + 1;
+         
+   const char **top = first;
+         
+   while (top < end)
+   {
+      const char **stop = (*flow_function)(top, end, gutter, columns_to_show, lines_to_show);
+      if (show_paged_output)
+      {
+         printf("\n\nPage %d of %d.  "
+                "'n' for next page, "
+                "'p' for previous page, "
+                "'q' to quit.\n",
+                (int)((top - first) / page_capacity) + 1,
+                page_count);
+
+         char keybuff[10];
+         while (get_keypress(keybuff, sizeof(keybuff)))
+         {
+            if (*keybuff == 'q')
+               goto abandon_display;
+            else if (*keybuff == 'n')
+            {
+               // Only break out if more pages remain
+               if (stop < end)
+               {
+                  top = stop;
+                  break;
+               }
+            }
+            else if (*keybuff == 'p')
+            {
+               // Only break out if previous page exists
+               if ((top - first) > page_capacity)
+               {
+                  top -= page_capacity;
+                  break;
+               }
+            }
+         }
+      }
+      else
+         top = stop;
+   }
+
+  abandon_display:
+   ;
+}
+
+
 raAction actions[] = {
    {'h', "help",        "This help display",                       &ra_show_help_agent },
    {'s', "show_values", "Show set values.",                        &ra_show_values_agent },
@@ -344,13 +418,13 @@ raAction actions[] = {
    {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &max_lines},
    {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo},
    {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs},
+   {'p', "paged",   "Show paged output.",                          &ra_flag_agent, &show_paged_output},
    {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string}
 };
    
 int main(int argc, const char **argv)
 {
    ra_set_scene(argv, argc, actions, ACTS_COUNT(actions));
-
 
    if (ra_process_arguments())
    {
@@ -363,7 +437,7 @@ int main(int argc, const char **argv)
 
       // *first_string* is NULL if the user entered no strings.
       if (first_string)
-         tabulate(first_string, end, &count, &maxlen);
+         tabulate_for_columns(first_string, end, &count, &maxlen);
 
       if (show_format_demo)
          demo_string_formatting();
@@ -378,19 +452,9 @@ int main(int argc, const char **argv)
       }
 
       if (strings_file)
-         arrayify_file(strings_file, use_arrayified_string, NULL);
+         arrayify_file(strings_file, display_columns, NULL);
       else if (first_string)
-      {
-         const char **top = first_string;
-         while (top < end)
-         {
-            const char **stop = (*flow_function)(top, end, gutter, max_columns, max_lines);
-            top = stop;
-         }
-      }
-
-      /* display_parallel_columns(first_string end, gutter, max_columns); */
-      /* display_newspaper_columns(first_string, end, gutter, max_columns); */
+         display_columns(end - first_string, first_string, NULL);
    }
 
    return 0;
