@@ -90,6 +90,10 @@ void gk_set_default_read_mode(void)
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &tcur);
 }
 
+/*
+ * Function returns 0 until the user presses a key.
+ * Loop to wait for a keypress.
+ */
 int get_keypress(char *buff, int bufflen)
 {
    int bytes_read;
@@ -114,7 +118,7 @@ int get_keypress(char *buff, int bufflen)
    gk_unset_raw_mode();
 
    if (ptr == buff)
-      dprintf(STDERR_FILENO, "\n\e[31;1mctt_get_keypress buffer overflow.\e[m\n");
+      fprintf(stderr, "\n\x1b[31;1mctt_get_keypress buffer overflow.\x1b[m\n");
 
    return ptr > buff;
 }
