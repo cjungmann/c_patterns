@@ -51,6 +51,7 @@ void tabulate_for_columns(const char **start, const char **end, int *count, int 
  *
  * The function returns a pointer to the string following the last printed string.
  */
+#include "get_keypress.h"
 const char ** display_newspaper_columns(const char **start,
                                         const char **end,
                                         int gutter,
@@ -69,24 +70,38 @@ const char ** display_newspaper_columns(const char **start,
    if (max_columns && columns > max_columns)
       columns = max_columns;
 
-   int lines = count / columns;
-   if (count % columns)
-      ++lines;
+   int page_capacity = columns * (max_lines ? max_lines : tall);
 
-   // Copy *end* in case a line limit also limits strings to print
    const char **stop = end;
-
-   if (max_lines && max_lines < lines)
+   if (max_lines)
    {
+      if (count < page_capacity)
+         stop = start + count;
+      else
+         stop = start + page_capacity;
+   }
+
+   int lines;
+
+   if (max_lines)
       lines = max_lines;
-      stop = start + ( lines * columns );
+   else
+   {
+      lines = count / columns;
+      // Extra line needed if not evenly divisible
+      if (count % columns)
+         ++lines;
    }
 
    const char **anchor_line = start;
    const char **ptr = start;
 
+   int counter = 0;
+
    while (ptr < stop)
    {
+      ++counter;
+      
       printf("%-*s", colwidth, *ptr);
 
       // skip ahead to neighboring string
@@ -95,7 +110,7 @@ const char ** display_newspaper_columns(const char **start,
       // If calcluated neighboring string is out-of-range,
       if (ptr >= stop)
       {
-         // Return pointer to string that belongs in left-most column,
+         // return pointer to string that belongs in left-most column,
          ptr = ++anchor_line;
          // then move to the left-most column for the next print.
          printf("\n");
@@ -143,6 +158,7 @@ const char ** display_parallel_columns(const char **start,
    // Copy *end* in case a line limit also limits strings to print
    const char **stop = end;
 
+   // If restrict *end* if it would print past max_lines
    if (max_lines && max_lines < lines)
    {
       lines = max_lines;
@@ -186,6 +202,7 @@ int show_format_demo = 0;
 int show_screen_specs = 0;
 int show_paged_output = 0;
 int max_lines = 0;
+const char *parsing_ifs = "\n";
 const char **first_string = NULL;
 const char *strings_file = NULL;
 flow_function_f flow_function = display_newspaper_columns;
@@ -333,7 +350,9 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 
-void display_columns(int argc, const char **first, void *closure)
+
+
+void display_columns(const char **first, int argc, void *closure)
 {
    const char **end = first + argc;
 
@@ -357,16 +376,23 @@ void display_columns(int argc, const char **first, void *closure)
    int items_in_list = (int)(end - first);
    int page_count = (items_in_list / page_capacity) + 1;
          
-   const char **top = first;
-         
-   while (top < end)
+   if (!show_paged_output || page_count == 1)
    {
-      // Erase page and move cursor to left-most column
-      printf("\x1b[2J\x1b[1G");
-      const char **stop = (*flow_function)(top, end, gutter, columns_to_show, lines_to_show);
+      (*flow_function)(first, end, gutter, columns_to_show, 0);
+   }
+   else
+   {
+      const char **top = first;
 
-      if (show_paged_output)
+      while (top < end)
       {
+         // Erase page and move cursor to left-most column
+         printf("\x1b[2J\x1b[1G");
+
+         // print data
+         const char **stop = (*flow_function)(top, end, gutter, columns_to_show, lines_to_show);
+
+         // user chooses next action
          printf("(%2d/%2d) "
                 "'n' (next page) "
                 "'p' (previous page) "
@@ -404,12 +430,14 @@ void display_columns(int argc, const char **first, void *closure)
             }
          }
       }
-      else
-         top = stop;
+     abandon_keywait:
+      printf("\x1b[2K");
    }
-   
-  abandon_keywait:
-   printf("\x1b[2K");
+}
+
+void use_array(int argc, const char **argv, void *closure)
+{
+   display_columns(argv, argc, closure);
 }
 
 
@@ -422,6 +450,7 @@ raAction actions[] = {
    {'f', "file",    "File with strings to columnize (set IFS to change delimiters)",
               &ra_string_agent, &strings_file},
    {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &gutter},
+   {'i', "ifs",     "Internal field (element) separator",          &ra_string_agent, &parsing_ifs},
    {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &max_lines},
    {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &max_lines},
    {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo},
@@ -432,6 +461,8 @@ raAction actions[] = {
    
 int main(int argc, const char **argv)
 {
+   arrayify_set_ifs(parsing_ifs);
+
    ra_set_scene(argv, argc, actions, ACTS_COUNT(actions));
 
    if (ra_process_arguments())
@@ -460,9 +491,9 @@ int main(int argc, const char **argv)
       }
 
       if (strings_file)
-         arrayify_file(strings_file, display_columns, NULL);
+         arrayify_file(strings_file, use_array, NULL);
       else if (first_string)
-         display_columns(end - first_string, first_string, NULL);
+         display_columns(first_string, end - first_string, NULL);
    }
 
    return 0;
