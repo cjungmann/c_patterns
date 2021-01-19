@@ -28,9 +28,9 @@ void get_screen_dimensions(int *wide, int *tall)
  * in pointer arguments *count* and *maxlen* to predict
  * the number of rows and columns can be displayed.
  */
-void tabulate_for_columns(const char **start, const char **end, int *count, int *maxlen)
+void tabulate_for_columns(const char **start, const char **end, int *maxlen)
 {
-   *count = *maxlen = 0;
+   *maxlen = 0;
 
    const char **ptr = start;
    size_t curlen;
@@ -38,7 +38,6 @@ void tabulate_for_columns(const char **start, const char **end, int *count, int 
    {
       curlen = strlen(*ptr);
 
-      ++*count;
       if (*maxlen < curlen)
          *maxlen = curlen;
 
@@ -51,7 +50,6 @@ void tabulate_for_columns(const char **start, const char **end, int *count, int 
  *
  * The function returns a pointer to the string following the last printed string.
  */
-#include "get_keypress.h"
 const char ** display_newspaper_columns(const char **start,
                                         const char **end,
                                         int gutter,
@@ -61,8 +59,9 @@ const char ** display_newspaper_columns(const char **start,
    int wide, tall;
    get_screen_dimensions(&wide, &tall);
 
-   int count, maxlen;
-   tabulate_for_columns(start, end, &count, &maxlen);
+   int count = (int)(end - start);
+   int maxlen;
+   tabulate_for_columns(start, end, &maxlen);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -137,11 +136,13 @@ const char ** display_parallel_columns(const char **start,
                                        int max_columns,
                                        int max_lines)
 {
+   int count = end - start;
+
    int wide, tall;
    get_screen_dimensions(&wide, &tall);
 
-   int count, maxlen;
-   tabulate_for_columns(start, end, &count, &maxlen);
+   int maxlen;
+   tabulate_for_columns(start, end, &maxlen);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -182,26 +183,95 @@ const char ** display_parallel_columns(const char **start,
    return stop;
 }
 
+/*
+ * Paged presentation of columnar data, invoking a callback function
+ * for moving between pages or to quit.
+ */
+void columnize_pager(const char **elements,
+                     int element_count,
+                     struct columnize_page_dims *dims,
+                     columnize_pager_control_f controller)
+{
+   const char **end = elements + element_count;
+
+   // Collect screen dimensions and list specs
+   int wide, tall;
+   get_screen_dimensions(&wide, &tall);
+
+   int max_el_length = 0;
+   tabulate_for_columns(elements, end, &max_el_length);
+
+   int columns_to_show = wide / ( max_el_length + dims->gutter );
+   if ( dims->max_columns && columns_to_show > dims->max_columns )
+      columns_to_show = dims->max_columns;
+
+   // Leave two lines for prompt
+   int lines_to_show = tall - dims->reserve_lines;
+
+   int page_capacity = columns_to_show * lines_to_show;
+   int page_count = (element_count / page_capacity) + 1;
+         
+   if (!dims->paged_output || page_count == 1)
+   {
+      // Don't set max_lines to produce unpaged output.
+      (*dims->flower)(elements, end, dims->gutter, columns_to_show, 0);
+   }
+   else
+   {
+      const char **top = elements;
+
+      while (top < end)
+      {
+         // print data
+         const char **stop = (*dims->flower)(top, end, dims->gutter, columns_to_show, lines_to_show);
+
+         int curpage = (int)(top - elements) / page_capacity + 1;
+
+         int dir = (*controller)(curpage, page_count);
+         switch(dir)
+         {
+            case CPR_QUIT:
+               goto abandon_keywait;
+               break;
+
+            case CPR_NEXT:
+               if (stop < end)
+                  top = stop;
+               break;
+
+            case CPR_PREVIOUS:
+               if (curpage > 1)
+                  top -= page_capacity;
+               break;
+
+            case CPR_FIRST:
+               top = elements;
+               break;
+
+            case CPR_LAST:
+               top = elements + ((page_count-1) * page_capacity);
+               break;
+         }
+
+      }
+     abandon_keywait:
+      printf("\x1b[2K");
+   }
+}
+
 #ifdef COLUMNIZE_MAIN
 
 #include "arrayify.c"
 #include "get_keypress.c"
 
-typedef const char ** (*flow_function_f)(const char **start,
-                                         const char **end,
-                                         int gutter,
-                                         int max_columns,
-                                         int max_lines);
 
 /*
  * State variables to be handled with *readargs*
  */
-int gutter = 3;
-int max_columns = 0;
+struct columnize_page_dims dims = { display_newspaper_columns, 3, 0, 3, 1 };
+
 int show_format_demo = 0;
 int show_screen_specs = 0;
-int show_paged_output = 0;
-int max_lines = 0;
 const char *parsing_ifs = "\n";
 const char **first_string = NULL;
 const char *strings_file = NULL;
@@ -223,7 +293,7 @@ void use_arrayified_string(int argc, const char **argv, void *closure)
    const char **end = argv + argc;
 
    while (ptr < end)
-      ptr = (*flow_function)(ptr, end, gutter, max_columns, max_lines);
+      ptr = (*flow_function)(ptr, end, dims.gutter, dims.max_columns, dims.max_lines);
 }
 
 void demo_string_formatting(void)
@@ -352,92 +422,56 @@ const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 
 
-void display_columns(const char **first, int argc, void *closure)
+CPRD pager_controller(int page_current, int page_count)
 {
-   const char **end = first + argc;
+   CPRD rval = CPR_NO_RESPONSE;
+   static const char color_on[] = "\x1b[32;1m";
+   static const char color_off[] = "\x1b[m";
 
-   // Collect screen dimensions and list specs
-   int wide, tall;
-   get_screen_dimensions(&wide, &tall);
+   // user chooses next action
+   printf("(%2d/%2d) "
+          "%sf%sirst "
+          "%sn%sext "
+          "%sp%srevious "
+          "%sl%sast "
+          "%sq%suit ",
+          page_current, page_count,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off
+      );
 
-   int count = 0, maxlen = 0;
-   tabulate_for_columns(first, end, &count, &maxlen);
+   // Push output without newline
+   fflush(stdout);
+   // Set cursor to column 1 of current line
+   printf("\x1b[1G");
 
-   int columns_to_show = wide / ( maxlen + gutter );
-   if ( max_columns && columns_to_show > max_columns )
-      columns_to_show = max_columns;
-
-   // Leave two lines for prompt
-   int lines_to_show = tall - 2;
-   if ( max_lines && lines_to_show > max_lines )
-      lines_to_show = max_lines;
-
-   int page_capacity = columns_to_show * lines_to_show;
-   int items_in_list = (int)(end - first);
-   int page_count = (items_in_list / page_capacity) + 1;
-         
-   if (!show_paged_output || page_count == 1)
+   char keybuff[10];
+   while (rval==CPR_NO_RESPONSE && get_keypress(keybuff, sizeof(keybuff)))
    {
-      (*flow_function)(first, end, gutter, columns_to_show, 0);
-   }
-   else
-   {
-      const char **top = first;
-
-      while (top < end)
+      switch(*keybuff)
       {
-         // Erase page and move cursor to left-most column
-         printf("\x1b[2J\x1b[1G");
-
-         // print data
-         const char **stop = (*flow_function)(top, end, gutter, columns_to_show, lines_to_show);
-
-         // user chooses next action
-         printf("(%2d/%2d) "
-                "'n' (next page) "
-                "'p' (previous page) "
-                "'q' (quit)",
-                (int)((top - first) / page_capacity) + 1,
-                page_count);
-
-         // Push output without newline
-         fflush(stdout);
-         // Set cursor to column 1 of current line
-         printf("\x1b[1G");
-
-         char keybuff[10];
-         while (get_keypress(keybuff, sizeof(keybuff)))
-         {
-            if (*keybuff == 'q')
-               goto abandon_keywait;
-            else if (*keybuff == 'n')
-            {
-               // Only break out if more pages remain
-               if (stop < end)
-               {
-                  top = stop;
-                  break;
-               }
-            }
-            else if (*keybuff == 'p')
-            {
-               // Only break out if previous page exists
-               if ((top - first) >= page_capacity)
-               {
-                  top -= page_capacity;
-                  break;
-               }
-            }
-         }
+         case 'q': rval = CPR_QUIT;     break;
+         case 'f': rval = CPR_FIRST;    break;
+         case 'n': rval = CPR_NEXT;     break;
+         case 'p': rval = CPR_PREVIOUS; break;
+         case 'l': rval = CPR_LAST;     break;
       }
-     abandon_keywait:
-      printf("\x1b[2K");
    }
+   
+   // Erase page and move cursor to left-most column
+   if (rval != CPR_QUIT)
+      printf("\x1b[2J\x1b[1G");
+
+   return rval;
 }
+
 
 void use_array(int argc, const char **argv, void *closure)
 {
-   display_columns(argv, argc, closure);
+   columnize_pager(argv, argc, &dims, pager_controller);
 }
 
 
@@ -445,17 +479,22 @@ raAction actions[] = {
    {'h', "help",        "This help display",                       &ra_show_help_agent },
    {'s', "show_values", "Show set values.",                        &ra_show_values_agent },
 
-   {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &max_columns},
-   {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &flow_function},
+   // Access to pager dimensions gutter, max_columns, and max_lines
+   {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &dims.max_columns},
+   {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &dims.gutter},
+   // the following two intentionally change the same variable
+   {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &dims.max_lines},
+   {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &dims.max_lines},
+   {'p', "paged",   "Show paged output.",                          &ra_flag_agent, &dims.paged_output},
+
+   {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &dims.flower},
    {'f', "file",    "File with strings to columnize (set IFS to change delimiters)",
               &ra_string_agent, &strings_file},
-   {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &gutter},
    {'i', "ifs",     "Internal field (element) separator",          &ra_string_agent, &parsing_ifs},
-   {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &max_lines},
-   {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &max_lines},
+
+
    {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo},
    {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs},
-   {'p', "paged",   "Show paged output.",                          &ra_flag_agent, &show_paged_output},
    {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string}
 };
    
@@ -472,11 +511,11 @@ int main(int argc, const char **argv)
       get_screen_dimensions(&wide, &tall);
 
       const char **end = argv + argc;
-      int count = 0, maxlen = 0;
+      int maxlen = 0;
 
       // *first_string* is NULL if the user entered no strings.
       if (first_string)
-         tabulate_for_columns(first_string, end, &count, &maxlen);
+         tabulate_for_columns(first_string, end, &maxlen);
 
       if (show_format_demo)
          demo_string_formatting();
@@ -487,13 +526,13 @@ int main(int argc, const char **argv)
 
          if (first_string)
             printf("For your list of %d strings, the longest string is %d characters.\n",
-                   count, maxlen);
+                   (int)(end - first_string), maxlen);
       }
 
       if (strings_file)
          arrayify_file(strings_file, use_array, NULL);
       else if (first_string)
-         display_columns(first_string, end - first_string, NULL);
+         columnize_pager(first_string, end - first_string, &dims, pager_controller);
    }
 
    return 0;

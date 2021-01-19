@@ -19,7 +19,7 @@
  */
 
 void get_screen_dimensions(int *wide, int *tall);
-void tabulate_for_columns(const char **start, const char **end, int *count, int *maxlen);
+void tabulate_for_columns(const char **start, const char **end, int *maxlen);
 
 const char ** display_newspaper_columns(const char **start,
                                         const char **end,
@@ -32,5 +32,48 @@ const char ** display_parallel_columns(const char **start,
                                        int gutter,
                                        int max_columns,
                                        int max_lines);
+
+typedef const char ** (*flow_function_f)(const char **start,
+                                         const char **end,
+                                         int gutter,
+                                         int max_columns,
+                                         int max_lines);
+
+struct columnize_page_dims {
+   flow_function_f flower;
+   int             gutter;
+   int             max_columns;
+   int             reserve_lines;  // subtract from screen height to get max_lines for flow function
+   int             paged_output;
+   
+} COLDIMS;
+
+/*
+ * Easy-set best dimension settings.
+ */
+void columnize_default_dims(struct columnize_page_dims *dims)
+{
+   dims->flower = display_newspaper_columns;
+   dims->gutter = 3;
+   dims->max_columns = 0;
+   dims->reserve_lines = 2;
+   dims->paged_output = 1;
+}
+
+typedef enum columnize_pager_directions {
+   CPR_NO_RESPONSE,
+   CPR_QUIT,
+   CPR_FIRST,
+   CPR_PREVIOUS,
+   CPR_NEXT,
+   CPR_LAST
+} CPRD;
+
+typedef CPRD (*columnize_pager_control_f)(int page_current, int page_count);
+
+void columnize_pager(const char **elements,
+                     int element_count,
+                     struct columnize_page_dims *dims,
+                     columnize_pager_control_f controller);
    
 #endif
