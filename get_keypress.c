@@ -123,6 +123,41 @@ int get_keypress(char *buff, int bufflen)
    return ptr > buff;
 }
 
+int await_keypress(const char **keys, int keycount)
+{
+   int maxlen = 0;
+
+   if (keys)
+   {
+      const char **end = keys + keycount;
+      for (const char **ptr=keys; ptr < end; ++ptr)
+      {
+         int slen = strlen(*ptr);
+         if (slen > maxlen)
+            maxlen = slen;
+      }
+      
+      char buff[maxlen + 1];
+      while(get_keypress(buff, sizeof(buff)))
+      {
+         for (const char **ptr=keys; ptr < end; ++ptr)
+         {
+            if (!strcmp(*ptr, buff))
+               return ptr - keys;
+         }
+      }
+   }
+   else
+   {
+      // Wait for any key if no keys passed
+      char buff[10];
+      while (!get_keypress(buff, sizeof(buff)))
+         ;
+   }
+
+   return -1;
+}
+
 #ifdef GET_KEYPRESS_MAIN
 
 #include <stdio.h>
@@ -136,15 +171,21 @@ const char test_prefix[] =
 
 void print_char_vals(const char *str)
 {
-   while (*str)
+   for (const char *ptr=str; *ptr; ++ptr)
    {
-      if (iscntrl(*str))
-         printf("[31m^%c[m", (*str)+64);
+      if (iscntrl(*ptr))
+         printf("[31m^%c[m", (*ptr)+64);
       else
-         printf("%c", *str);
-
-      ++str;
+         printf("%c", *ptr);
    }
+
+   printf(" (");
+
+   for (const char *ptr=str; *ptr; ++ptr) 
+      printf("\\x%02x ", *ptr);
+
+   printf(") ");
+  
 }
 
 void test_buff_size(int buffsize)
@@ -162,6 +203,26 @@ void test_buff_size(int buffsize)
    }
 }
 
+void test_await(void)
+{
+   printf("Test new function, await_keypress().\n"
+          "This function waits for one of a list of\n"
+          "keypresses before exiting, returning the\n"
+          "index of the keypress selected.\n");
+
+   const char* keys[] = {
+      "q",
+      "n",
+      "\x0b"    // ENTER
+   };
+
+   int val = await_keypress(keys, sizeof(keys)/sizeof(keys[0]));
+   if (val < 0)
+      printf("keypress aborted.\n");
+   else
+      printf("You pressed %s (item %d).\n", keys[val], val);
+}
+
 int main(int argc, const char **argv)
 {
    printf("A keypress may return multiple characters.\n"
@@ -174,8 +235,12 @@ int main(int argc, const char **argv)
    printf("Test with 10 character buffer.\n");
    test_buff_size(10);
 
-   printf("\n\nTest with a 3 character buffer.  This should terminate prematurely.\n");
+   printf("\n\nTest with a 3 character buffer.\n"
+          "Many keystrokes will overflow the buffer.\n"
+          "This will likely terminate prematurely.\n");
    test_buff_size(3);
+
+   test_await();
 }
 
 #endif
