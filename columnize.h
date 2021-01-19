@@ -48,17 +48,7 @@ struct columnize_page_dims {
    
 } COLDIMS;
 
-/*
- * Easy-set best dimension settings.
- */
-void columnize_default_dims(struct columnize_page_dims *dims)
-{
-   dims->flower = display_newspaper_columns;
-   dims->gutter = 3;
-   dims->max_columns = 0;
-   dims->reserve_lines = 2;
-   dims->paged_output = 1;
-}
+void columnize_default_dims(struct columnize_page_dims *dims);
 
 typedef enum columnize_pager_directions {
    CPR_NO_RESPONSE,

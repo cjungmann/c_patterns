@@ -184,6 +184,18 @@ const char ** display_parallel_columns(const char **start,
 }
 
 /*
+ * Easy-set best dimension settings.
+ */
+void columnize_default_dims(struct columnize_page_dims *dims)
+{
+   dims->flower = display_newspaper_columns;
+   dims->gutter = 3;
+   dims->max_columns = 0;
+   dims->reserve_lines = 2;
+   dims->paged_output = 1;
+}
+
+/*
  * Paged presentation of columnar data, invoking a callback function
  * for moving between pages or to quit.
  */
