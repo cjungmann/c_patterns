@@ -213,7 +213,7 @@ void test_await(void)
    const char* keys[] = {
       "q",
       "n",
-      "\x0b"    // ENTER
+      "\x0d"    // ENTER (CR or ^M)
    };
 
    int val = await_keypress(keys, sizeof(keys)/sizeof(keys[0]));
@@ -232,6 +232,7 @@ int main(int argc, const char **argv)
           "As a result, the size of the character buffer does.\n"
           "matter.  The following is a test of two sizes of buffer.\n"
           "\n");
+   
    printf("Test with 10 character buffer.\n");
    test_buff_size(10);
 
