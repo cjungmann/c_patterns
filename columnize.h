@@ -33,22 +33,9 @@ const char ** display_parallel_columns(const char **start,
                                        int max_columns,
                                        int max_lines);
 
-typedef const char ** (*flow_function_f)(const char **start,
-                                         const char **end,
-                                         int gutter,
-                                         int max_columns,
-                                         int max_lines);
-
-struct columnize_page_dims {
-   flow_function_f flower;
-   int             gutter;
-   int             max_columns;
-   int             reserve_lines;  // subtract from screen height to get max_lines for flow function
-   int             paged_output;
-   
-} COLDIMS;
-
-void columnize_default_dims(struct columnize_page_dims *dims);
+/*
+ * Pager support follows, including typedefs and function prototypes.
+ */
 
 typedef enum columnize_pager_directions {
    CPR_NO_RESPONSE,
@@ -59,11 +46,29 @@ typedef enum columnize_pager_directions {
    CPR_LAST
 } CPRD;
 
-typedef CPRD (*columnize_pager_control_f)(int page_current, int page_count);
+typedef const char ** (*flow_function_f)(const char **start,
+                                         const char **end,
+                                         int gutter,
+                                         int max_columns,
+                                         int max_lines);
+
+typedef CPRD (*page_control_f)(int page_current, int page_count);
+
+typedef struct columnize_page_dims {
+   flow_function_f flower;
+   page_control_f  pcontrol;
+   int             gutter;
+   int             max_columns;
+   int             reserve_lines;  // subtract from screen height to get max_lines for flow function
+   int             paged_output;
+} COLDIMS;
+
+void columnize_default_dims(struct columnize_page_dims *dims);
+
+CPRD columnize_default_controller(int page_current, int page_count);
 
 void columnize_pager(const char **elements,
                      int element_count,
-                     struct columnize_page_dims *dims,
-                     columnize_pager_control_f controller);
+                     struct columnize_page_dims *dims);
    
 #endif

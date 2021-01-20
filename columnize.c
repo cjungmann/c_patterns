@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "columnize.h"
+#include "get_keypress.h"
 
 /*
  * Use simple ioctl function to query the screen size in
@@ -189,6 +190,7 @@ const char ** display_parallel_columns(const char **start,
 void columnize_default_dims(struct columnize_page_dims *dims)
 {
    dims->flower = display_newspaper_columns;
+   dims->pcontrol = columnize_default_controller;
    dims->gutter = 3;
    dims->max_columns = 0;
    dims->reserve_lines = 2;
@@ -201,8 +203,7 @@ void columnize_default_dims(struct columnize_page_dims *dims)
  */
 void columnize_pager(const char **elements,
                      int element_count,
-                     struct columnize_page_dims *dims,
-                     columnize_pager_control_f controller)
+                     struct columnize_page_dims *dims)
 {
    const char **end = elements + element_count;
 
@@ -239,7 +240,7 @@ void columnize_pager(const char **elements,
 
          int curpage = (int)(top - elements) / page_capacity + 1;
 
-         int dir = (*controller)(curpage, page_count);
+         int dir = (*dims->pcontrol)(curpage, page_count);
          switch(dir)
          {
             case CPR_QUIT:
@@ -271,6 +272,53 @@ void columnize_pager(const char **elements,
    }
 }
 
+CPRD columnize_default_controller(int page_current, int page_count)
+{
+   CPRD rval = CPR_NO_RESPONSE;
+   static const char color_on[] = "\x1b[32;1m";
+   static const char color_off[] = "\x1b[m";
+
+   // user chooses next action
+   printf("(%2d/%2d) "
+          "%sf%sirst "
+          "%sn%sext "
+          "%sp%srevious "
+          "%sl%sast "
+          "%sq%suit ",
+          page_current, page_count,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off,
+          color_on, color_off
+      );
+
+   // Push output without newline
+   fflush(stdout);
+   // Set cursor to column 1 of current line
+   printf("\x1b[1G");
+
+   char keybuff[10];
+   while (rval==CPR_NO_RESPONSE && get_keypress(keybuff, sizeof(keybuff)))
+   {
+      switch(*keybuff)
+      {
+         case 'q': rval = CPR_QUIT;     break;
+         case 'f': rval = CPR_FIRST;    break;
+         case 'n': rval = CPR_NEXT;     break;
+         case 'p': rval = CPR_PREVIOUS; break;
+         case 'l': rval = CPR_LAST;     break;
+      }
+   }
+   
+   // Erase page and move cursor to left-most column
+   if (rval != CPR_QUIT)
+      printf("\x1b[2J\x1b[1G");
+
+   return rval;
+}
+
+
 #ifdef COLUMNIZE_MAIN
 
 #include "arrayify.c"
@@ -280,10 +328,11 @@ void columnize_pager(const char **elements,
 /*
  * State variables to be handled with *readargs*
  */
-struct columnize_page_dims dims = { display_newspaper_columns, 3, 0, 3, 1 };
+struct columnize_page_dims g_dims = { 0 };
 
 int show_format_demo = 0;
 int show_screen_specs = 0;
+int max_lines = 0;
 const char *parsing_ifs = "\n";
 const char **first_string = NULL;
 const char *strings_file = NULL;
@@ -305,7 +354,7 @@ void use_arrayified_string(int argc, const char **argv, void *closure)
    const char **end = argv + argc;
 
    while (ptr < end)
-      ptr = (*flow_function)(ptr, end, dims.gutter, dims.max_columns, dims.max_lines);
+      ptr = (*flow_function)(ptr, end, g_dims.gutter, g_dims.max_columns, max_lines);
 }
 
 void demo_string_formatting(void)
@@ -434,84 +483,39 @@ const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 
 
-CPRD pager_controller(int page_current, int page_count)
-{
-   CPRD rval = CPR_NO_RESPONSE;
-   static const char color_on[] = "\x1b[32;1m";
-   static const char color_off[] = "\x1b[m";
-
-   // user chooses next action
-   printf("(%2d/%2d) "
-          "%sf%sirst "
-          "%sn%sext "
-          "%sp%srevious "
-          "%sl%sast "
-          "%sq%suit ",
-          page_current, page_count,
-          color_on, color_off,
-          color_on, color_off,
-          color_on, color_off,
-          color_on, color_off,
-          color_on, color_off
-      );
-
-   // Push output without newline
-   fflush(stdout);
-   // Set cursor to column 1 of current line
-   printf("\x1b[1G");
-
-   char keybuff[10];
-   while (rval==CPR_NO_RESPONSE && get_keypress(keybuff, sizeof(keybuff)))
-   {
-      switch(*keybuff)
-      {
-         case 'q': rval = CPR_QUIT;     break;
-         case 'f': rval = CPR_FIRST;    break;
-         case 'n': rval = CPR_NEXT;     break;
-         case 'p': rval = CPR_PREVIOUS; break;
-         case 'l': rval = CPR_LAST;     break;
-      }
-   }
-   
-   // Erase page and move cursor to left-most column
-   if (rval != CPR_QUIT)
-      printf("\x1b[2J\x1b[1G");
-
-   return rval;
-}
-
-
 void use_array(int argc, const char **argv, void *closure)
 {
-   columnize_pager(argv, argc, &dims, pager_controller);
+   columnize_pager(argv, argc, &g_dims);
 }
 
 
 raAction actions[] = {
-   {'h', "help",        "This help display",                       &ra_show_help_agent },
-   {'s', "show_values", "Show set values.",                        &ra_show_values_agent },
+   {'h', "help",        "This help display",                     &ra_show_help_agent },
+   {'s', "show_values", "Show set values.",                      &ra_show_values_agent },
 
    // Access to pager dimensions gutter, max_columns, and max_lines
-   {'c', "columns", "Upper limit of columns to display",           &ra_int_agent,  &dims.max_columns},
-   {'g', "gutter",  "Minimum spaces between columns",              &ra_int_agent,  &dims.gutter},
+   {'c', "columns", "Upper limit of columns to display",         &ra_int_agent,  &g_dims.max_columns},
+   {'g', "gutter",  "Minimum spaces between columns",            &ra_int_agent,  &g_dims.gutter},
    // the following two intentionally change the same variable
-   {'l', "lines",   "Line limit per \"page.\"",                    &ra_int_agent,  &dims.max_lines},
-   {'r', "rows",   "Row limit per \"page.\"",                      &ra_int_agent,  &dims.max_lines},
-   {'p', "paged",   "Show paged output.",                          &ra_flag_agent, &dims.paged_output},
+   {'l', "lines",   "Line limit per \"page.\"",                  &ra_int_agent,  &max_lines},
+   {'r', "rows",    "Row limit per \"page.\"",                   &ra_int_agent,  &max_lines},
+   {'p', "paged",   "Show paged output.",                        &ra_flag_agent, &g_dims.paged_output},
 
-   {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,    &dims.flower},
+   {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,   &g_dims.flower},
    {'f', "file",    "File with strings to columnize (set IFS to change delimiters)",
               &ra_string_agent, &strings_file},
-   {'i', "ifs",     "Internal field (element) separator",          &ra_string_agent, &parsing_ifs},
+   {'i', "ifs",     "Internal field (element) separator",        &ra_string_agent, &parsing_ifs},
 
 
-   {'d', NULL,      "Show string formatting demo.",                &ra_flag_agent, &show_format_demo},
-   {'S', NULL,      "Show screen specs.",                          &ra_flag_agent, &show_screen_specs},
-   {-1,  "*list_start", "First string of list",                    &findarg_agent, &first_string}
+   {'d', NULL,      "Show string formatting demo.",              &ra_flag_agent, &show_format_demo},
+   {'S', NULL,      "Show screen specs.",                        &ra_flag_agent, &show_screen_specs},
+   {-1,  "*list_start", "First string of list",                  &findarg_agent, &first_string}
 };
    
 int main(int argc, const char **argv)
 {
+   columnize_default_dims(&g_dims);
+
    arrayify_set_ifs(parsing_ifs);
 
    ra_set_scene(argv, argc, actions, ACTS_COUNT(actions));
@@ -544,7 +548,7 @@ int main(int argc, const char **argv)
       if (strings_file)
          arrayify_file(strings_file, use_array, NULL);
       else if (first_string)
-         columnize_pager(first_string, end - first_string, &dims, pager_controller);
+         columnize_pager(first_string, end - first_string, &g_dims);
    }
 
    return 0;
