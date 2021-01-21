@@ -21,17 +21,29 @@
 void get_screen_dimensions(int *wide, int *tall);
 void tabulate_for_columns(const char **start, const char **end, int *maxlen);
 
-const char ** display_newspaper_columns(const char **start,
-                                        const char **end,
+typedef struct columnize_eliface {
+   int (*get_len)(const void *el);
+   int (*print)(FILE *f, const void *el);
+   int (*print_cell)(FILE *f, const void *el, int width);
+} CEIF;
+
+int columnize_get_max_len(CEIF *iface, const void **start, const void **end);
+
+const void ** display_newspaper_columns(CEIF *iface,
+                                        const void **start,
+                                        const void **end,
                                         int gutter,
                                         int max_columns,
                                         int max_lines);
 
-const char ** display_parallel_columns(const char **start,
-                                       const char **end,
+const void ** display_parallel_columns(CEIF *iface,
+                                       const void **start,
+                                       const void **end,
                                        int gutter,
                                        int max_columns,
                                        int max_lines);
+
+extern CEIF ceif_string;
 
 /*
  * Pager support follows, including typedefs and function prototypes.
@@ -46,8 +58,9 @@ typedef enum columnize_pager_directions {
    CPR_LAST
 } CPRD;
 
-typedef const char ** (*flow_function_f)(const char **start,
-                                         const char **end,
+typedef const void ** (*flow_function_f)(CEIF *iface,
+                                         const void **start,
+                                         const void **end,
                                          int gutter,
                                          int max_columns,
                                          int max_lines);
@@ -67,8 +80,13 @@ void columnize_default_dims(struct columnize_page_dims *dims);
 
 CPRD columnize_default_controller(int page_current, int page_count);
 
-void columnize_pager(const char **elements,
+void columnize_pager(CEIF *iface,
+                     const void **elements,
                      int element_count,
                      struct columnize_page_dims *dims);
+
+void columnize_string_pager(const char **elements,
+                            int element_count,
+                            struct columnize_page_dims *dims);
    
 #endif

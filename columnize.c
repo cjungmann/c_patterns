@@ -10,6 +10,28 @@
 #include "columnize.h"
 #include "get_keypress.h"
 
+
+int columnize_string_get_len(const void *el)
+{
+   return strlen((const char *)el);
+}
+
+int columnize_string_print(FILE *f, const void *el)
+{
+   return fprintf(f, "%s", (const char*)el);
+}
+
+int columnize_string_print_cell(FILE *f, const void *el, int width)
+{
+   return fprintf(f, "%-*s", width, (const char*)el);
+}
+
+CEIF ceif_string = {
+   columnize_string_get_len,
+   columnize_string_print,
+   columnize_string_print_cell
+};
+
 /*
  * Use simple ioctl function to query the screen size in
  * characters.  Return the dimensions in pointer arguments
@@ -46,13 +68,26 @@ void tabulate_for_columns(const char **start, const char **end, int *maxlen)
    }
 }
 
+int columnize_get_max_len(CEIF *iface, const void **start, const void **end)
+{
+   int cur_len, max_len = 0;
+   for (const void **ptr = start; ptr < end; ++ptr)
+   {
+      cur_len = (*iface->get_len)(*ptr);
+      if (cur_len > max_len)
+         max_len = cur_len;
+   }
+   return max_len;
+}
+
 /**
  * Flow columnar data top-to-bottom before moving to next column to the right.
  *
  * The function returns a pointer to the string following the last printed string.
  */
-const char ** display_newspaper_columns(const char **start,
-                                        const char **end,
+const void ** display_newspaper_columns(CEIF *iface,
+                                        const void **start,
+                                        const void **end,
                                         int gutter,
                                         int max_columns,
                                         int max_lines)
@@ -61,8 +96,7 @@ const char ** display_newspaper_columns(const char **start,
    get_screen_dimensions(&wide, &tall);
 
    int count = (int)(end - start);
-   int maxlen;
-   tabulate_for_columns(start, end, &maxlen);
+   int maxlen = columnize_get_max_len(iface, start, end);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -72,7 +106,9 @@ const char ** display_newspaper_columns(const char **start,
 
    int page_capacity = columns * (max_lines ? max_lines : tall);
 
-   const char **stop = end;
+   // Adjust stopping point if restricted by caller
+   // preferences or page capacity
+   const void **stop = end;
    if (max_lines)
    {
       if (count < page_capacity)
@@ -93,8 +129,8 @@ const char ** display_newspaper_columns(const char **start,
          ++lines;
    }
 
-   const char **anchor_line = start;
-   const char **ptr = start;
+   const void **anchor_line = start;
+   const void **ptr = start;
 
    int counter = 0;
 
@@ -102,8 +138,7 @@ const char ** display_newspaper_columns(const char **start,
    {
       ++counter;
       
-      printf("%-*s", colwidth, *ptr);
-
+      (*iface->print_cell)(stdout, *ptr, colwidth);
       // skip ahead to neighboring string
       ptr += lines;
 
@@ -131,8 +166,9 @@ const char ** display_newspaper_columns(const char **start,
  *
  * The function returns a pointer to the string following the last printed string.
  */
-const char ** display_parallel_columns(const char **start,
-                                       const char **end,
+const void ** display_parallel_columns(CEIF *iface,
+                                       const void **start,
+                                       const void **end,
                                        int gutter,
                                        int max_columns,
                                        int max_lines)
@@ -142,8 +178,7 @@ const char ** display_parallel_columns(const char **start,
    int wide, tall;
    get_screen_dimensions(&wide, &tall);
 
-   int maxlen;
-   tabulate_for_columns(start, end, &maxlen);
+   int maxlen = columnize_get_max_len(iface, start, end);
 
    int colwidth = maxlen + gutter;
    int columns = wide / colwidth;
@@ -151,16 +186,15 @@ const char ** display_parallel_columns(const char **start,
    if (max_columns && columns > max_columns)
       columns = max_columns;
 
-   const char **ptr = start;
+   const void **ptr = start;
 
    int lines = count / columns;
    if (count % columns)
       ++lines;
 
-   // Copy *end* in case a line limit also limits strings to print
-   const char **stop = end;
-
-   // If restrict *end* if it would print past max_lines
+   // Adjust stopping point if restricted by caller
+   // preferences or page capacity
+   const void **stop = end;
    if (max_lines && max_lines < lines)
    {
       lines = max_lines;
@@ -170,7 +204,7 @@ const char ** display_parallel_columns(const char **start,
    int column = 0;
    while (ptr < stop)
    {
-      printf("%-*s", colwidth, *ptr);
+      (*iface->print_cell)(stdout, *ptr, colwidth);
 
       column = ((column+1) % columns);
       if (!column)
@@ -201,18 +235,18 @@ void columnize_default_dims(struct columnize_page_dims *dims)
  * Paged presentation of columnar data, invoking a callback function
  * for moving between pages or to quit.
  */
-void columnize_pager(const char **elements,
+void columnize_pager(CEIF *iface,
+                     const void **elements,
                      int element_count,
                      struct columnize_page_dims *dims)
 {
-   const char **end = elements + element_count;
+   const void **end = elements + element_count;
 
    // Collect screen dimensions and list specs
    int wide, tall;
    get_screen_dimensions(&wide, &tall);
 
-   int max_el_length = 0;
-   tabulate_for_columns(elements, end, &max_el_length);
+   int max_el_length = columnize_get_max_len(iface, elements, end);
 
    int columns_to_show = wide / ( max_el_length + dims->gutter );
    if ( dims->max_columns && columns_to_show > dims->max_columns )
@@ -227,16 +261,21 @@ void columnize_pager(const char **elements,
    if (!dims->paged_output || page_count == 1)
    {
       // Don't set max_lines to produce unpaged output.
-      (*dims->flower)(elements, end, dims->gutter, columns_to_show, 0);
+      (*dims->flower)(iface, elements, end, dims->gutter, columns_to_show, 0);
    }
    else
    {
-      const char **top = elements;
+      const void **top = elements;
 
       while (top < end)
       {
          // print data
-         const char **stop = (*dims->flower)(top, end, dims->gutter, columns_to_show, lines_to_show);
+         const void **stop = (*dims->flower)(iface,
+                                             top,
+                                             end,
+                                             dims->gutter,
+                                             columns_to_show,
+                                             lines_to_show);
 
          int curpage = (int)(top - elements) / page_capacity + 1;
 
@@ -271,6 +310,15 @@ void columnize_pager(const char **elements,
       printf("\x1b[2K");
    }
 }
+
+void columnize_string_pager(const char **elements,
+                            int element_count,
+                            struct columnize_page_dims *dims)
+{
+   const void **start = (const void**)elements;
+   columnize_pager(&ceif_string, start, element_count, dims);
+}
+
 
 CPRD columnize_default_controller(int page_current, int page_count)
 {
@@ -350,11 +398,11 @@ flow_function_f flow_function = display_newspaper_columns;
 
 void use_arrayified_string(int argc, const char **argv, void *closure)
 {
-   const char **ptr = argv;
-   const char **end = argv + argc;
+   const void **ptr = (const void**)argv;
+   const void **end = ptr + argc;
 
    while (ptr < end)
-      ptr = (*flow_function)(ptr, end, g_dims.gutter, g_dims.max_columns, max_lines);
+      ptr = (*flow_function)(&ceif_string, ptr, end, g_dims.gutter, g_dims.max_columns, max_lines);
 }
 
 void demo_string_formatting(void)
@@ -483,9 +531,9 @@ const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 
 
-void use_array(int argc, const char **argv, void *closure)
+void use_string_array(int argc, const char **argv, void *closure)
 {
-   columnize_pager(argv, argc, &g_dims);
+   columnize_string_pager(argv, argc, &g_dims);
 }
 
 
@@ -546,9 +594,9 @@ int main(int argc, const char **argv)
       }
 
       if (strings_file)
-         arrayify_file(strings_file, use_array, NULL);
+         arrayify_file(strings_file, use_string_array, NULL);
       else if (first_string)
-         columnize_pager(first_string, end - first_string, &g_dims);
+         columnize_string_pager(first_string, end - first_string, &g_dims);
    }
 
    return 0;
