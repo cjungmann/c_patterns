@@ -105,13 +105,34 @@ there are examples of using custom *readargs* agents.
 This was the initial inspiration for creating *columnize.c*, but is
 only an after thought now.
 
-In making columnar output, I used a string conversion with an
-asterisk in order to specify the number of spaces to print along
-with the string.
+The conversion specifiers in `printf` can include numbers that control
+padding and output length.  I was familiar using these numbers when
+printing integers and floating type values.  It turns out that these
+numbers also affect how a string is printed in ways unfamiliar to me.
 
-Having used this *printf* feature before, I thought I understood how
-it worked.  Working with columns showed me that I didn't understand.
-The following may help you (or future me) understand how it works.
+Another new realization was that the width and precision specifications
+can be replaced with asterisks to be filled with integer values in
+the arguments following the format string.
+
+The string control and variable specifiers are particularly useful.
+This section discusses some code patterns for exploiting these
+features.
+
+### Printing an Unterminated String
+
+When working with raw data records or when printing a substring
+from a larger string, you may not be able to depend on an `'\0'`
+string terminator.  In these cases, you may need to tell `printf`
+how many characters to print.
+
+~~~c
+// The argument, str, is not guaranteed to be terminated with an \0,
+// but string_length does accurately indicates the string length.
+void show_print(const char *str, int string_length)
+{
+   printf("%.*s", string_length, str);
+}
+~~~
 
 ### Printing Out a List of Spaces
 
@@ -162,10 +183,28 @@ following code:
 
 ~~~c
 int cell_width = 5;
+
 const char *str = "bogus";
 printf("%*.s", cell_width, str);     // expected "bogus", printed 5 spaces
 printf("%.*", cell_width, "");       // expected 5 spaces, got NO spaces
 ~~~
+
+### Combining Padding and Unterminated String
+
+Using both the width and precision values of the conversion specifier,
+you can pad and limit printing in one specifier:
+
+~~~c
+void padded_print(const char *str, int string_length, int output_width)
+{
+   // right-justified (padding left of string)
+   printf("%*.*s", output_width, string_length, str);
+   // left-justified (padding right of string)
+   printf("%-*.*s", output_width, string_length, str);
+}
+~~~
+
+
 
 ### Demonstration of *printf* outputs
 
