@@ -27,16 +27,16 @@ typedef struct columnize_eliface {
    int (*print_cell)(FILE *f, const void *el, int width);
 } CEIF;
 
-int columnize_get_max_len(CEIF *iface, const void **start, const void **end);
+int columnize_get_max_len(const CEIF *iface, const void **start, const void **end);
 
-const void ** display_newspaper_columns(CEIF *iface,
+const void ** display_newspaper_columns(const CEIF *iface,
                                         const void **start,
                                         const void **end,
                                         int gutter,
                                         int max_columns,
                                         int max_lines);
 
-const void ** display_parallel_columns(CEIF *iface,
+const void ** display_parallel_columns(const CEIF *iface,
                                        const void **start,
                                        const void **end,
                                        int gutter,
@@ -58,7 +58,7 @@ typedef enum columnize_pager_directions {
    CPR_LAST
 } CPRD;
 
-typedef const void ** (*flow_function_f)(CEIF *iface,
+typedef const void ** (*flow_function_f)(const CEIF *iface,
                                          const void **start,
                                          const void **end,
                                          int gutter,
@@ -80,7 +80,7 @@ void columnize_default_dims(struct columnize_page_dims *dims);
 
 CPRD columnize_default_controller(int page_current, int page_count);
 
-void columnize_pager(CEIF *iface,
+void columnize_pager(const CEIF *iface,
                      const void **elements,
                      int element_count,
                      struct columnize_page_dims *dims);

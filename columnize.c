@@ -68,7 +68,7 @@ void tabulate_for_columns(const char **start, const char **end, int *maxlen)
    }
 }
 
-int columnize_get_max_len(CEIF *iface, const void **start, const void **end)
+int columnize_get_max_len(const CEIF *iface, const void **start, const void **end)
 {
    int cur_len, max_len = 0;
    for (const void **ptr = start; ptr < end; ++ptr)
@@ -85,7 +85,7 @@ int columnize_get_max_len(CEIF *iface, const void **start, const void **end)
  *
  * The function returns a pointer to the string following the last printed string.
  */
-const void ** display_newspaper_columns(CEIF *iface,
+const void ** display_newspaper_columns(const CEIF *iface,
                                         const void **start,
                                         const void **end,
                                         int gutter,
@@ -166,7 +166,7 @@ const void ** display_newspaper_columns(CEIF *iface,
  *
  * The function returns a pointer to the string following the last printed string.
  */
-const void ** display_parallel_columns(CEIF *iface,
+const void ** display_parallel_columns(const CEIF *iface,
                                        const void **start,
                                        const void **end,
                                        int gutter,
@@ -235,7 +235,7 @@ void columnize_default_dims(struct columnize_page_dims *dims)
  * Paged presentation of columnar data, invoking a callback function
  * for moving between pages or to quit.
  */
-void columnize_pager(CEIF *iface,
+void columnize_pager(const CEIF *iface,
                      const void **elements,
                      int element_count,
                      struct columnize_page_dims *dims)
