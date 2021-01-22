@@ -446,6 +446,13 @@ void demo_string_formatting(void)
           "using \"%%5.s\" prints empty spaces instead of the contents\n"
           "of the string, while \"%%5s\" prints the string.\n");
 
+   printf("\n"
+          "%%10.5s:  ->%10.5s<-\n"
+          "%%-10.5s: ->%-10.5s<-\n",
+          "abcdefghij",
+          "abcdefghij"
+      );
+
    printf("\n");
    
 
