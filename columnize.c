@@ -221,7 +221,7 @@ const void ** display_parallel_columns(const CEIF *iface,
 /*
  * Easy-set best dimension settings.
  */
-void columnize_default_dims(struct columnize_page_dims *dims)
+void columnize_default_dims(struct columnize_page_dims *dims, void *closure)
 {
    dims->flower = display_newspaper_columns;
    dims->pcontrol = columnize_default_controller;
@@ -229,6 +229,7 @@ void columnize_default_dims(struct columnize_page_dims *dims)
    dims->max_columns = 0;
    dims->reserve_lines = 2;
    dims->paged_output = 1;
+   dims->closure = closure;
 }
 
 /*
@@ -279,7 +280,7 @@ void columnize_pager(const CEIF *iface,
 
          int curpage = (int)(top - elements) / page_capacity + 1;
 
-         int dir = (*dims->pcontrol)(curpage, page_count);
+         int dir = (*dims->pcontrol)(curpage, page_count, dims);
          switch(dir)
          {
             case CPR_QUIT:
@@ -320,7 +321,7 @@ void columnize_string_pager(const char **elements,
 }
 
 
-CPRD columnize_default_controller(int page_current, int page_count)
+CPRD columnize_default_controller(int page_current, int page_count, COLDIMS *dims)
 {
    CPRD rval = CPR_NO_RESPONSE;
    static const char color_on[] = "\x1b[32;1m";
@@ -381,6 +382,7 @@ struct columnize_page_dims g_dims = { 0 };
 int show_format_demo = 0;
 int show_screen_specs = 0;
 int max_lines = 0;
+int use_alt_pager = 0;
 const char *parsing_ifs = "\n";
 const char **first_string = NULL;
 const char *strings_file = NULL;
@@ -535,9 +537,73 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
 
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
+/*
+ * Setting an alternative page controller
+ * Uses a very simple custom agent to execute this preference.
+ *
+ * This section includes
+ * - an alternative controller (alt_page_control()) that sets the default page control,
+ * - a reader function for the pager agent
+ * - the agent, using the reader function.
+ */
+
+CPRD alt_page_control(int cur_page, int count_pages, COLDIMS *dims)
+{
+   CPRD rval = CPR_NO_RESPONSE;
+   
+   printf("This is line 1.\n"
+          "This is line 2.\n"
+          "(%d/%d) _f_irst _p_revious _n_ext _l_ast _q_uit.",
+          cur_page, count_pages);
+
+   // Push output without newline
+   fflush(stdout);
+   // Set cursor to column 1 of current line
+   printf("\x1b[1G");
+
+   const char *keys[] = { "f", "p", "n", "l", "q" };
+
+   int index = await_keypress(keys, sizeof(keys)/sizeof(keys[0]));
+   if (index < 0)
+   {
+      fprintf(stderr, "Unexpected keypress\n");
+      goto abandon_function;
+   }
+   else
+   {
+      switch(index)
+      {
+         case 0: rval = CPR_FIRST;    break;
+         case 1: rval = CPR_PREVIOUS; break;
+         case 2: rval = CPR_NEXT;     break;
+         case 3: rval = CPR_LAST;     break;
+         case 4: rval = CPR_QUIT;     break;
+         default:
+            printf("Unexpected index (%d) returned from await_keypress.\n", index);
+            goto abandon_function;
+      }
+   }
+
+   if (rval != CPR_QUIT)
+      printf("\x1b[2J\x1b[1G");
+
+  abandon_function:
+   return rval;
+}
+
+raStatus alt_pager_reader(const raAction *act, const char *str, raTour *tour)
+{
+   g_dims.reserve_lines = 4;
+   g_dims.pcontrol = alt_page_control;
+   return RA_SUCCESS;
+}
+
+const raAgent alt_pager = { 0, alt_pager_reader, NULL };
 
 
-
+/*
+ * arrayify_file() callback function that calls columnize.
+ */
 void use_string_array(int argc, const char **argv, void *closure)
 {
    columnize_string_pager(argv, argc, &g_dims);
@@ -555,6 +621,7 @@ raAction actions[] = {
    {'l', "lines",   "Line limit per \"page.\"",                  &ra_int_agent,  &max_lines},
    {'r', "rows",    "Row limit per \"page.\"",                   &ra_int_agent,  &max_lines},
    {'p', "paged",   "Show paged output.",                        &ra_flag_agent, &g_dims.paged_output},
+   {'a', "alt-pager", "Use alternative page controller.",        &alt_pager },
 
    {'F', "flow",    "Flow orientation, (n)ewspaper or (p)arallel", &flow_agent,   &g_dims.flower},
    {'f', "file",    "File with strings to columnize (set IFS to change delimiters)",
@@ -569,7 +636,7 @@ raAction actions[] = {
    
 int main(int argc, const char **argv)
 {
-   columnize_default_dims(&g_dims);
+   columnize_default_dims(&g_dims, NULL);
 
    arrayify_set_ifs(parsing_ifs);
 

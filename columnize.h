@@ -50,8 +50,8 @@ extern CEIF ceif_string;
  */
 
 typedef enum columnize_pager_directions {
-   CPR_NO_RESPONSE,
-   CPR_QUIT,
+   CPR_NO_RESPONSE = -1,
+   CPR_QUIT = 0,
    CPR_FIRST,
    CPR_PREVIOUS,
    CPR_NEXT,
@@ -65,7 +65,9 @@ typedef const void ** (*flow_function_f)(const CEIF *iface,
                                          int max_columns,
                                          int max_lines);
 
-typedef CPRD (*page_control_f)(int page_current, int page_count);
+struct columnize_page_dims;
+
+typedef CPRD (*page_control_f)(int page_current, int page_count, struct columnize_page_dims *dims);
 
 typedef struct columnize_page_dims {
    flow_function_f flower;
@@ -74,11 +76,12 @@ typedef struct columnize_page_dims {
    int             max_columns;
    int             reserve_lines;  // subtract from screen height to get max_lines for flow function
    int             paged_output;
+   void            *closure;
 } COLDIMS;
 
-void columnize_default_dims(struct columnize_page_dims *dims);
+void columnize_default_dims(struct columnize_page_dims *dims, void *closure);
 
-CPRD columnize_default_controller(int page_current, int page_count);
+CPRD columnize_default_controller(int page_current, int page_count, COLDIMS *dims);
 
 void columnize_pager(const CEIF *iface,
                      const void **elements,
