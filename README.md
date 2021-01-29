@@ -28,7 +28,7 @@ line.  In EMACS, compile with `M-x compile`.
   which is then made available through a callback function
   modeled after main() with a void return type.
 
-- get_keypress
+- get_keypress  
   Functions the provide immediate recognition of individual
   keypresses, including non-printable keys.
   
