@@ -155,6 +155,12 @@ const void ** display_newspaper_columns(const CEIF *iface,
             break;
       }
    }
+
+   // If not enough entries, add extra lines to push first element to top-of-screen:
+   int lines_left = lines - ( stop - start );
+   if (lines_left > 0)
+      for (int i=0; i<lines_left; ++i)
+         printf("\n");
    
    printf("\n");
 
