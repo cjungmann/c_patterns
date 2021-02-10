@@ -1,25 +1,7 @@
 #ifndef COLUMNIZE_H
 #define COLUMNIZE_H
 
-/*
- * Typedef and two matching prototypes for two implementations
- * of columnar output.
- *
- * The functions expect an array of strings, with *end* being
- * a pointer to an imaginary element after the last element.
- * With that assumption, you can set the *end* value as
- * *start* + number_of_elements;
- *
- * The parameters *gutter*, *max_columns*, and *max_lines*
- * affect the output.  *gutter* is added to the length of the
- * longest list to make the column cell width.
- *
- * *max_columns* and *max_lines*, if not set to 0, 
- * 
- */
-
 void get_screen_dimensions(int *wide, int *tall);
-int get_max_size(const char **start, const char **end);
 
 /*
  * This interface abstracts the information needed to
@@ -35,9 +17,21 @@ typedef struct columnize_el_iface {
    int (*print_cell)(FILE *f, const void *el, int width);
 } CEIF;
 
+// Simple interface for strings.
 extern CEIF ceif_string;
 
 int columnize_get_max_len(const CEIF *iface, const void **start, const void **end);
+int get_max_string_len(const char **start, const char **end);
+
+
+/* Typedef so we can toggle between two different column flow models. */
+typedef const void ** (*flow_function_f)(const CEIF *iface,
+                                         const void **start,
+                                         const void **end,
+                                         int gutter,
+                                         int max_columns,
+                                         int max_lines);
+
 
 const void ** display_newspaper_columns(const CEIF *iface,
                                         const void **start,
@@ -56,7 +50,6 @@ const void ** display_parallel_columns(const CEIF *iface,
 /*
  * Pager support follows, including typedefs and function prototypes.
  */
-
 typedef enum columnize_pager_directions {
    CPR_NO_RESPONSE = -1,
    CPR_QUIT = 0,
@@ -67,38 +60,48 @@ typedef enum columnize_pager_directions {
    CPR_CUSTOM
 } CPRD;
 
-typedef const void ** (*flow_function_f)(const CEIF *iface,
-                                         const void **start,
-                                         const void **end,
-                                         int gutter,
-                                         int max_columns,
-                                         int max_lines);
 
-struct columnize_page_dims;
+typedef struct pager_params {
+   const void **start;
+   const void **end;
 
-typedef CPRD (*page_control_f)(int page_current, int page_count, struct columnize_page_dims *dims);
+   int gutter;
+   int reserve_lines;
+   int max_size;
 
-typedef struct columnize_page_dims {
-   flow_function_f flower;
-   page_control_f  pcontrol;
-   int             gutter;
-   int             max_columns;
-   int             reserve_lines;  // subtract from screen height to get max_lines for flow function
-   int             paged_output;
-   void            *closure;
-} COLDIMS;
+   const void **ptr;
 
-void columnize_default_dims(struct columnize_page_dims *dims, void *closure);
+   int win_wide;
+   int win_tall;
+   int columns_to_show;
+   int lines_to_show;
+   int page_capacity;
+} PPARAMS;
 
-CPRD columnize_default_controller(int page_current, int page_count, COLDIMS *dims);
+void PPARAMS_init(PPARAMS *params,
+                  const void **start,
+                  int el_count,
+                  int gutter,
+                  int reserve_lines,
+                  int max_size);
 
-void columnize_pager(const CEIF *iface,
-                     const void **elements,
-                     int element_count,
-                     struct columnize_page_dims *dims);
+void PPARAMS_query_screen(PPARAMS *params);
 
-void columnize_string_pager(const char **elements,
-                            int element_count,
-                            struct columnize_page_dims *dims);
+typedef const void** (*PPARAMS_mover)(PPARAMS *params);
+extern PPARAMS_mover pparams_movers[];
+
+const void** PPARAMS_first(PPARAMS *params);
+const void** PPARAMS_previous(PPARAMS *params);
+const void** PPARAMS_next(PPARAMS *params);
+const void** PPARAMS_last(PPARAMS *params);
+int PPARAMS_page_count(const PPARAMS *params);
+int PPARAMS_pointer_index(const PPARAMS *params, const void **ptr);
+const void** PPARAMS_move(PPARAMS *params, CPRD request);
+
+void columnize_print_progress(PPARAMS *params, const void **stop);
+
+
+
+
    
 #endif
