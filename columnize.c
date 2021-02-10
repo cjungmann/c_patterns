@@ -51,9 +51,9 @@ void get_screen_dimensions(int *wide, int *tall)
  * in pointer arguments *count* and *maxlen* to predict
  * the number of rows and columns can be displayed.
  */
-void tabulate_for_columns(const char **start, const char **end, int *maxlen)
+int get_max_size(const char **start, const char **end)
 {
-   *maxlen = 0;
+   int maxlen = 0;
 
    const char **ptr = start;
    size_t curlen;
@@ -61,11 +61,13 @@ void tabulate_for_columns(const char **start, const char **end, int *maxlen)
    {
       curlen = strlen(*ptr);
 
-      if (*maxlen < curlen)
-         *maxlen = curlen;
+      if (maxlen < curlen)
+         maxlen = curlen;
 
       ++ptr;
    }
+
+   return maxlen;
 }
 
 int columnize_get_max_len(const CEIF *iface, const void **start, const void **end)
@@ -82,6 +84,7 @@ int columnize_get_max_len(const CEIF *iface, const void **start, const void **en
 
 /**
  * Flow columnar data top-to-bottom before moving to next column to the right.
+ * It is an implementation of *flow_function_f* 
  *
  * The function returns a pointer to the string following the last printed string.
  */
@@ -659,7 +662,7 @@ int main(int argc, const char **argv)
 
       // *first_string* is NULL if the user entered no strings.
       if (first_string)
-         tabulate_for_columns(first_string, end, &maxlen);
+         maxlen = get_max_size(first_string, end);
 
       if (show_format_demo)
          demo_string_formatting();

@@ -90,6 +90,18 @@ void gk_set_default_read_mode(void)
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &tcur);
 }
 
+void gk_hide_cursor(void)
+{
+   fputs("\x1b[?25l", stdout);
+   fflush(stdout);
+}
+
+void gk_show_cursor(void)
+{
+   fputs("\x1b[?25h", stdout);
+   fflush(stdout);
+}
+
 /*
  * Function returns 0 until the user presses a key.
  * Loop to wait for a keypress.
@@ -126,6 +138,9 @@ int get_keypress(char *buff, int bufflen)
 int await_keypress(const char **keys, int keycount)
 {
    int maxlen = 0;
+   int retval = -1;
+
+   gk_hide_cursor();
 
    if (keys)
    {
@@ -136,14 +151,16 @@ int await_keypress(const char **keys, int keycount)
          if (slen > maxlen)
             maxlen = slen;
       }
-      
       char buff[maxlen + 1];
       while(get_keypress(buff, sizeof(buff)))
       {
          for (const char **ptr=keys; ptr < end; ++ptr)
          {
             if (!strcmp(*ptr, buff))
-               return ptr - keys;
+            {
+               retval = ptr-keys;
+               goto exit_function;
+            }
          }
       }
    }
@@ -155,7 +172,10 @@ int await_keypress(const char **keys, int keycount)
          ;
    }
 
-   return -1;
+  exit_function:
+   gk_show_cursor();
+
+   return retval;
 }
 
 #ifdef GET_KEYPRESS_MAIN

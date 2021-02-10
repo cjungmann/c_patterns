@@ -19,13 +19,23 @@
  */
 
 void get_screen_dimensions(int *wide, int *tall);
-void tabulate_for_columns(const char **start, const char **end, int *maxlen);
+int get_max_size(const char **start, const char **end);
 
-typedef struct columnize_eliface {
+/*
+ * This interface abstracts the information needed to
+ * prepare a column view of data.  The ceif_string is the
+ * simplest implementation of this for string elements, but
+ * an ambitious developer might create an interface for
+ * formatting a list that includes index numbers or another
+ * characteristic.
+ */
+typedef struct columnize_el_iface {
    int (*get_len)(const void *el);
    int (*print)(FILE *f, const void *el);
    int (*print_cell)(FILE *f, const void *el, int width);
 } CEIF;
+
+extern CEIF ceif_string;
 
 int columnize_get_max_len(const CEIF *iface, const void **start, const void **end);
 
@@ -43,8 +53,6 @@ const void ** display_parallel_columns(const CEIF *iface,
                                        int max_columns,
                                        int max_lines);
 
-extern CEIF ceif_string;
-
 /*
  * Pager support follows, including typedefs and function prototypes.
  */
@@ -55,7 +63,8 @@ typedef enum columnize_pager_directions {
    CPR_FIRST,
    CPR_PREVIOUS,
    CPR_NEXT,
-   CPR_LAST
+   CPR_LAST,
+   CPR_CUSTOM
 } CPRD;
 
 typedef const void ** (*flow_function_f)(const CEIF *iface,
