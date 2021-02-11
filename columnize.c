@@ -538,22 +538,23 @@ void columnize_string_array(const char **list, int list_count)
 
    PPARAMS_query_screen(&params);
 
-   const void **ptr = PPARAMS_first(&params);
-   const void **end = (const void **)(list + list_count);
    CPRD cprd;
 
    flow_function_f flower = display_newspaper_columns;
+
+   // Prepare for initial display at first element
+   const void **ptr = PPARAMS_first(&params);
 
    while (1)
    {
       const void **stop = (*flower)(&ceif_string,
                                     ptr,
-                                    end,
+                                    params.end,
                                     params.gutter,
                                     params.columns_to_show,
                                     params.lines_to_show);
 
-      columnize_print_progress(params, stop);
+      columnize_print_progress(&params, stop);
       prompter_print_prompts(legend_keys, legend_keys_count);
 
      recheck_user_response:
@@ -570,8 +571,7 @@ void columnize_string_array(const char **list, int list_count)
       }
    }
 
-   // Erase and reuse current line (so page contents do not scroll out of view):
-   printf("\x1b[2K\x1b[1G");
+   prompter_reuse_line();
 }
 
 
