@@ -147,6 +147,7 @@ const void ** display_newspaper_columns(const CEIF *iface,
    const void **ptr = start;
 
    int counter = 0;
+   int line_counter = 1;
 
    while (ptr < stop)
    {
@@ -167,14 +168,14 @@ const void ** display_newspaper_columns(const CEIF *iface,
          // We're done if we've gone past the final string on the left column
          if (ptr >= start+lines)
             break;
+         else
+            ++line_counter;
       }
    }
 
    // If not enough entries, add extra lines to push first element to top-of-screen:
-   int lines_left = lines - ( stop - start );
-   if (lines_left > 0)
-      for (int i=0; i<lines_left; ++i)
-         printf("\n");
+   while (line_counter++ < max_lines)
+      printf("\n");
    
    printf("\n");
 
@@ -222,16 +223,24 @@ const void ** display_parallel_columns(const CEIF *iface,
    }
 
    int column = 0;
+   int line_counter = 1;
    while (ptr < stop)
    {
       (*iface->print_cell)(stdout, *ptr, colwidth);
 
       column = ((column+1) % columns);
       if (!column)
+      {
          printf("\n");
+         ++line_counter;
+      }
 
       ++ptr;
    }
+
+   // If not enough entries, add extra lines to push first element to top-of-screen:
+   while (line_counter++ < max_lines+1)
+      printf("\n");
 
    printf("\n");
 
@@ -540,19 +549,17 @@ void columnize_string_array(const char **list, int list_count)
 
    CPRD cprd;
 
-   flow_function_f flower = display_newspaper_columns;
-
    // Prepare for initial display at first element
    const void **ptr = PPARAMS_first(&params);
 
    while (1)
    {
-      const void **stop = (*flower)(&ceif_string,
-                                    ptr,
-                                    params.end,
-                                    params.gutter,
-                                    params.columns_to_show,
-                                    params.lines_to_show);
+      const void **stop = (*flow_function)(&ceif_string,
+                                           ptr,
+                                           params.end,
+                                           params.gutter,
+                                           params.columns_to_show,
+                                           params.lines_to_show);
 
       columnize_print_progress(&params, stop);
       prompter_print_prompts(legend_keys, legend_keys_count);
