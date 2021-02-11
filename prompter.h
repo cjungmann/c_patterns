@@ -43,7 +43,7 @@ typedef struct prompter_set {
    const char **prompts;
    int *results;
    int prompt_count;
-   const Accenter *accenter;
+   Accenter *accenter;
 } PromptSet;
 
 
