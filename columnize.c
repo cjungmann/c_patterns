@@ -516,33 +516,18 @@ const char *legend_keys[] = {
 int legend_keys_count = sizeof(legend_keys) / sizeof(legend_keys[0]);
 
 // Transform returned index of prompt to CPDR enumeration:
-CPRD await_legend_keypress(const char **letters, int count)
+CPRD await_legend_keypress(const char **legend_strings, int count)
 {
-   int result = await_keypress(letters, count);
+   int result = prompter_await_prompt(legend_strings, count);
    if (result == 4)
       return CPR_QUIT;
    else
       return result + 1;
 }
 
-void array_user_page_legend(PPARAMS *params, const void **ptr_limit)
-{
-   columnize_print_progress(params, ptr_limit);
-   prompter_print_prompts(legend_keys, sizeof(legend_keys) / sizeof(legend_keys[0]));
-}
-
 void columnize_string_array(const char **list, int list_count)
 {
-   // Prepare user option prompts
-   int bufflen = prompter_initialize_letter_array(legend_keys_count, NULL, NULL, 0);
-   char buffer[bufflen];
-   char *letters[legend_keys_count];
-   prompter_initialize_letter_array(legend_keys_count, letters, buffer, bufflen);
-   prompter_fill_letter_array(letters, legend_keys_count, legend_keys);
-
    int maxlen = get_max_string_len(list, list + list_count);
-
-   flow_function_f flower = display_newspaper_columns;
 
    PPARAMS params;
    PPARAMS_init(&params,
@@ -557,6 +542,8 @@ void columnize_string_array(const char **list, int list_count)
    const void **end = (const void **)(list + list_count);
    CPRD cprd;
 
+   flow_function_f flower = display_newspaper_columns;
+
    while (1)
    {
       const void **stop = (*flower)(&ceif_string,
@@ -566,10 +553,11 @@ void columnize_string_array(const char **list, int list_count)
                                     params.columns_to_show,
                                     params.lines_to_show);
 
-      array_user_page_legend(&params, stop);
+      columnize_print_progress(params, stop);
+      prompter_print_prompts(legend_keys, legend_keys_count);
 
      recheck_user_response:
-      cprd = await_legend_keypress((const char **)letters, legend_keys_count);
+      cprd = await_legend_keypress((const char **)legend_keys, legend_keys_count);
       if (cprd == CPR_QUIT)
          break;
       else
