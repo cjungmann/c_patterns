@@ -1,6 +1,11 @@
 #ifndef PROMPTER_H
 #define PROMPTER_H
 
+/*
+ * The Accenter contains information needed to
+ * accent a specific letter in a prompt string
+ * to indicate the character that triggers the prompt.
+ */
 typedef void (*accenter_f)(char letter);
 
 /* Bundle customizable necessaities. */
@@ -27,6 +32,19 @@ extern Accenter default_accenter;
  * the non-accenter functions will use the custom Accenter.
  */
 extern Accenter *global_accenter;
+
+
+/*
+ * A PromptSet holds several bits of data
+ * to simplify the display and interpretation
+ * of a set of prompt strings.
+ */
+typedef struct prompter_set {
+   const char **prompts;
+   int *results;
+   int prompt_count;
+   const Accenter *accenter;
+} PromptSet;
 
 
 char prompter_get_accented_letter_acc(const char *str,
@@ -58,6 +76,9 @@ void prompter_print_prompts(const char **prompts, int count_prompts);
 int prompter_extract_prompt_letter(const char *prompt, char *prompt_letter);
 void prompter_fill_letter_array(char **letters, int count, const char **prompts);
 int prompter_await_prompt(const char **prompts, int count_prompts);
+
+void prompter_pset_print(const PromptSet *set);
+int prompter_pset_await(const PromptSet *set);
 
 void prompter_reuse_line(void);
 

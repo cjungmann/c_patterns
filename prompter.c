@@ -171,6 +171,18 @@ int prompter_await_prompt(const char **prompts, int count_prompts)
    return prompter_await_prompt_acc(prompts, count_prompts, global_accenter);
 }
 
+void prompter_pset_print(const PromptSet *set)
+{
+   prompter_print_prompts_acc(set->prompts, set->prompt_count, set->accenter);
+}
+
+int prompter_pset_await(const PromptSet *set)
+{
+   int result = prompter_await_prompt_acc(set->prompts, set->prompt_count, set->accenter);
+   return set->results[result];
+}
+
+
 /*
  * Erases console line and places cursor at left-most column.
  */
@@ -209,10 +221,9 @@ void test_fill_letter_array(void)
    }
 }
 
-int main(int argc, const char **argv)
+void test_await_prompt(void)
 {
-   /* test_fill_letter_array(); */
-
+   printf("This is a DIY (mostly) model.\n");
    int index = 0;
 
    while (index != 4)
@@ -224,7 +235,39 @@ int main(int argc, const char **argv)
       prompter_print_prompt(prompts[index], 0);
       printf("\n");
    }
-   
+}
+
+void test_promptset(void)
+{
+   printf("This model uses PromptSet to simplify operation.\n");
+
+   int transforms[] = {1, 2, 3, 4, 0};
+
+   PromptSet ps = {
+      prompts,
+      transforms,
+      sizeof(prompts)/sizeof(prompts[0]),
+      global_accenter };
+
+   int result = -1;
+
+   // quit returns 0 instead of 4 (position in string)
+   while (result)
+   {
+      prompter_reuse_line();
+      printf("Result was %3d.  ", result);
+      prompter_pset_print(&ps);
+      result = prompter_pset_await(&ps);
+   }
+
+   prompter_reuse_line();
+}
+
+int main(int argc, const char **argv)
+{
+   /* test_fill_letter_array(); */
+   /* test_await_prompt(); */
+   test_promptset();
 }
 
 #endif
