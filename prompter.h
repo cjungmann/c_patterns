@@ -59,5 +59,8 @@ int prompter_extract_prompt_letter(const char *prompt, char *prompt_letter);
 void prompter_fill_letter_array(char **letters, int count, const char **prompts);
 int prompter_await_prompt(const char **prompts, int count_prompts);
 
+void prompter_reuse_line(void);
+
+
 
 #endif

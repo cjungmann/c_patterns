@@ -171,6 +171,16 @@ int prompter_await_prompt(const char **prompts, int count_prompts)
    return prompter_await_prompt_acc(prompts, count_prompts, global_accenter);
 }
 
+/*
+ * Erases console line and places cursor at left-most column.
+ */
+void prompter_reuse_line(void)
+{
+   // ESC[2K   erases current line
+   // ESC[1G   moves cursor to column 1 of current line
+   printf("\x1b[2K\x1b[1G");
+}
+
 #ifdef PROMPTER_MAIN
 
 #include "get_keypress.c"
