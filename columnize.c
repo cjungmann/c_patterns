@@ -239,7 +239,7 @@ const void ** display_parallel_columns(const CEIF *iface,
    }
 
    // If not enough entries, add extra lines to push first element to top-of-screen:
-   while (line_counter++ < max_lines+1)
+   while (line_counter++ < max_lines)
       printf("\n");
 
    printf("\n");
@@ -516,12 +516,13 @@ raStatus findarg_reader(const raAction *act, const char *str, raTour *tour)
 const raAgent findarg_agent = { 1, findarg_reader, NULL };
 
 const char *legend_keys[] = {
-   "_f_irst",
-   "_p_revious",
-   "_n_ext",
-   "_l_ast",
-   "_q_uit"
+   "&first",
+   "&previous",
+   "&next",
+   "&last",
+   "&quit"
 };
+
 int legend_keys_count = sizeof(legend_keys) / sizeof(legend_keys[0]);
 
 // Transform returned index of prompt to CPDR enumeration:
