@@ -3,6 +3,10 @@
 
 typedef int pr_bool;
 
+#ifndef ARRLEN
+#define ARRLEN(X) (sizeof(X) / sizeof(X[0]))
+#endif
+
 /*
  * The Accenter contains information needed to
  * accent a specific letter in a prompt string

@@ -365,12 +365,39 @@ void test_punit_gambit(void)
    prompter_reuse_line();
 }
 
+void test_pmenu_gambit(void)
+{
+   PUnit punits[] = {
+      { "&alphabetic", 12 },
+      { "&frequency", 13 },
+      { "&rank", 14 },
+      { "&quit", 0 }
+   };
+   PMenu pmenu = { punits, ARRLEN(punits) };
+
+   printf("This is a test of the PMenu feature.\n");
+
+
+   int result = -1;
+   while (result != 0) 
+   {
+      prompter_reuse_line();
+      printf("Sorting order (%2d): ", result);
+      prompter_pmenu_print(&pmenu);
+
+      result = prompter_pmenu_await(&pmenu);
+   }
+
+   prompter_reuse_line();
+}
+
 int main(int argc, const char **argv)
 {
    /* test_fill_letter_array(); */
    /* test_await_prompt(); */
    /* test_promptset(); */
    test_punit_gambit();
+   test_pmenu_gambit();
 }
 
 #endif
