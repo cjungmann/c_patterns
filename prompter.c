@@ -280,7 +280,7 @@ const char *prompts[] = {
    "&last",
    "&quit"
 };
-int count_prompts = sizeof(prompts) / sizeof(prompts[0]);
+int count_prompts = ARRLEN(prompts);
 
 void test_fill_letter_array(void)
 {
@@ -322,7 +322,7 @@ void test_promptset(void)
    PromptSet ps = {
       prompts,
       transforms,
-      sizeof(prompts)/sizeof(prompts[0]),
+      ARRLEN(prompts),
       global_accenter };
 
    int result = -1;
@@ -347,7 +347,7 @@ void test_punit_gambit(void)
       { "&rank", 14 },
       { "&quit", 0 }
    };
-   int punits_count = sizeof(punits) / sizeof(punits[0]);
+   int punits_count = ARRLEN(punits);
 
    printf("This is a test of the PUnit feature.\n");
 
