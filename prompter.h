@@ -1,6 +1,8 @@
 #ifndef PROMPTER_H
 #define PROMPTER_H
 
+typedef int pr_bool;
+
 /*
  * The Accenter contains information needed to
  * accent a specific letter in a prompt string
@@ -12,6 +14,7 @@ typedef void (*accenter_f)(char letter);
 typedef struct accenter_t {
    accenter_f accent_char;
    char       *trigger;       // points to default_accenter_trigger
+   const char *divider;
 } Accenter;
 
 /*
@@ -33,6 +36,12 @@ extern Accenter default_accenter;
  */
 extern Accenter *global_accenter;
 
+typedef struct prompter_unit {
+   const char *prompt;
+   int value;
+} PUnit;
+
+
 
 /*
  * A PromptSet holds several bits of data
@@ -50,14 +59,15 @@ typedef struct prompter_set {
 char prompter_get_accented_letter_acc(const char *str,
                                       const Accenter *accenter);
 
-void prompter_print_prompt_acc(const char *prompt, int accent,
+void prompter_print_prompt_acc(const char *prompt, pr_bool accent,
                                const Accenter *accenter);
 
 void prompter_print_prompts_acc(const char **prompts, int count_prompts,
                                 const Accenter *accenter);
 
-int prompter_extract_prompt_letter_acc(const char *prompt, char *prompt_letter,
-                                       const Accenter *accenter);
+pr_bool prompter_extract_prompt_letter_acc(/*out*/ char *prompt_letter,
+                                           const char *prompt,
+                                           const Accenter *accenter);
 
 int prompter_await_prompt_acc(const char **prompts, int count_prompts,
                               const Accenter *accenter);
@@ -71,14 +81,19 @@ int prompter_await_prompt_acc(const char **prompts, int count_prompts, const Acc
 
 
 char prompter_get_accented_letter(const char *str);
-void prompter_print_prompt(const char *prompt, int accent);
+void prompter_print_prompt(const char *prompt, pr_bool accent);
 void prompter_print_prompts(const char **prompts, int count_prompts);
-int prompter_extract_prompt_letter(const char *prompt, char *prompt_letter);
+pr_bool prompter_extract_prompt_letter(/*out*/ char *prompt_letter, const char *prompt);
 void prompter_fill_letter_array(char **letters, int count, const char **prompts);
 int prompter_await_prompt(const char **prompts, int count_prompts);
 
 void prompter_pset_print(const PromptSet *set);
 int prompter_pset_await(const PromptSet *set);
+
+void prompter_punit_print_acc(const PUnit *units, int count, const Accenter *accenter);
+int prompter_punit_await_acc(const PUnit *units, int count, const Accenter *accenter);
+void prompter_punit_print(const PUnit *units, int count);
+int prompter_punit_await(const PUnit *units, int count);
 
 void prompter_reuse_line(void);
 

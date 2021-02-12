@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <memory.h>
+#include <assert.h>
 
 #include "get_keypress.h"
 #include "prompter.h"
@@ -13,37 +14,39 @@ void prompter_accenter_color(char letter)
    fputs(hilite_off, stdout);
 }
 
-char default_accenter_trigger = '_';
-Accenter default_accenter = { prompter_accenter_color, &default_accenter_trigger };
+char default_accenter_trigger = '&';
+Accenter default_accenter = { prompter_accenter_color, &default_accenter_trigger, " / " };
 Accenter *global_accenter = &default_accenter;
 
 char prompter_get_accented_letter_acc(const char *str, const Accenter *accenter)
 {
-   if (*str == *accenter->trigger
-       && *(++str)
-       && *(str+1) == *accenter->trigger)
+   if (*str++ == *accenter->trigger && *str)
       return *str;
    else
       return '\0';
 }
 
-void prompter_print_prompt_acc(const char *prompt, int accent, const Accenter *accenter)
+void prompter_print_prompt_acc(const char *prompt, pr_bool accent, const Accenter *accenter)
 {
    char letter;
 
    if (!accenter)
       accenter = &default_accenter;
 
+   pr_bool accent_found = 0;
+
    while (*prompt)
    {
-      if ((letter = prompter_get_accented_letter_acc(prompt, accenter)))
+      if (!accent_found && (letter = prompter_get_accented_letter_acc(prompt, accenter)))
       {
+         accent_found = 1;
+
          if (accent)
             accenter->accent_char(letter);
          else
             fputc(letter, stdout);
 
-         prompt += 2;
+         ++prompt;
       }
       else
          fputc(*prompt, stdout);
@@ -72,9 +75,9 @@ void prompter_print_prompts_acc(const char **prompts, int count_prompts, const A
    fputs("\x1b[1G", stdout);
 }
 
-int prompter_extract_prompt_letter_acc(const char *prompt,
-                                       char *prompt_letter,
-                                       const Accenter *accenter)
+pr_bool prompter_extract_prompt_letter_acc(/*out*/ char *prompt_letter,
+                                           const char *prompt,
+                                           const Accenter *accenter)
 {
    if (!accenter)
       accenter = &default_accenter;
@@ -120,7 +123,7 @@ void prompter_fill_letter_array_acc(char **letters,
 
    while (prompts < end)
    {
-      prompter_extract_prompt_letter_acc(*prompts, *letters, accenter);
+      prompter_extract_prompt_letter_acc(*letters, *prompts, accenter);
       ++letters;
       ++prompts;
    }
@@ -146,7 +149,7 @@ char prompter_get_accented_letter(const char *str)
    return prompter_get_accented_letter_acc(str, global_accenter);
 }
 
-void prompter_print_prompt(const char *prompt, int accent)
+void prompter_print_prompt(const char *prompt, pr_bool accent)
 {
    prompter_print_prompt_acc(prompt, accent, global_accenter);
 }
@@ -156,9 +159,9 @@ void prompter_print_prompts(const char **prompts, int count_prompts)
    prompter_print_prompts_acc(prompts, count_prompts, global_accenter);
 }
 
-int prompter_extract_prompt_letter(const char *prompt, char *prompt_letter)
+pr_bool prompter_extract_prompt_letter(/*out*/ char *prompt_letter, const char *prompt)
 {
-   return prompter_extract_prompt_letter_acc(prompt, prompt_letter, global_accenter);
+   return prompter_extract_prompt_letter_acc(prompt_letter, prompt, global_accenter);
 }
 
 void prompter_fill_letter_array(char **letters, int count, const char **prompts)
@@ -182,6 +185,59 @@ int prompter_pset_await(const PromptSet *set)
    return set->results[result];
 }
 
+void prompter_punit_print_acc(const PUnit *units, int count, const Accenter *accenter)
+{
+   const PUnit *end = units + count;
+   const PUnit *ptr = units;
+   while (ptr < end)
+   {
+      if (ptr > units)
+      {
+         if (accenter->divider)
+            fputs(accenter->divider, stdout);
+         else
+            fputc(' ', stdout);
+      }
+
+      prompter_print_prompt_acc(ptr->prompt, 1, accenter);
+      ++ptr;
+   }
+}
+
+void prompter_punit_print(const PUnit *units, int count)
+{
+   prompter_punit_print_acc(units, count, global_accenter);
+}
+
+int prompter_punit_await_acc(const PUnit *units, int count, const Accenter *accenter)
+{
+   char *letters[count];
+
+   int bufflen = prompter_initialize_letter_array(count, NULL, NULL, 0);
+   char buffer[bufflen];
+   prompter_initialize_letter_array(count, letters, buffer, bufflen);
+
+   const PUnit *end = units + count;
+   const PUnit *ptr = units;
+   char **lptr = (char **)letters;
+   while (ptr < end)
+   {
+      prompter_extract_prompt_letter_acc(*lptr, ptr->prompt, accenter);
+      ++lptr;
+      ++ptr;
+   }
+
+   int index = await_keypress((const char **)letters, count);
+   assert(index >=0 && index < count);
+
+   return units[index].value;
+}
+
+int prompter_punit_await(const PUnit *units, int count)
+{
+   return prompter_punit_await_acc(units, count, global_accenter);
+}
+
 
 /*
  * Erases console line and places cursor at left-most column.
@@ -198,11 +254,11 @@ void prompter_reuse_line(void)
 #include "get_keypress.c"
 
 const char *prompts[] = {
-   "_f_irst",
-   "_p_revious",
-   "_n_ext",
-   "_l_ast",
-   "_q_uit"
+   "&first",
+   "&previous",
+   "&next",
+   "&last",
+   "&quit"
 };
 int count_prompts = sizeof(prompts) / sizeof(prompts[0]);
 
@@ -263,11 +319,38 @@ void test_promptset(void)
    prompter_reuse_line();
 }
 
+void test_punit_gambit(void)
+{
+   PUnit punits[] = {
+      { "&alphabetic", 12 },
+      { "&frequency", 13 },
+      { "&rank", 14 },
+      { "&quit", 0 }
+   };
+   int punits_count = sizeof(punits) / sizeof(punits[0]);
+
+   printf("This is a test of the PUnit feature.\n");
+
+
+   int result = -1;
+   while (result != 0) 
+   {
+      prompter_reuse_line();
+      printf("Sorting order (%2d): ", result);
+      prompter_punit_print(punits, punits_count);
+
+      result = prompter_punit_await(punits, punits_count);
+   }
+
+   prompter_reuse_line();
+}
+
 int main(int argc, const char **argv)
 {
    /* test_fill_letter_array(); */
    /* test_await_prompt(); */
-   test_promptset();
+   /* test_promptset(); */
+   test_punit_gambit();
 }
 
 #endif
