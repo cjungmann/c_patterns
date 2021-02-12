@@ -53,6 +53,9 @@ void prompter_print_prompt_acc(const char *prompt, pr_bool accent, const Accente
 
       ++prompt;
    }
+
+   // Signal if accent not found
+   assert(accent_found);
 }
 
 void prompter_print_prompts_acc(const char **prompts, int count_prompts, const Accenter *accenter)
