@@ -238,6 +238,26 @@ int prompter_punit_await(const PUnit *units, int count)
    return prompter_punit_await_acc(units, count, global_accenter);
 }
 
+void prompter_pmenu_print_acc(const PMenu *menu, const Accenter *accenter)
+{
+   prompter_punit_print_acc(menu->items, menu->count, accenter);
+}
+
+int prompter_pmenu_await_acc(const PMenu *menu, const Accenter *accenter)
+{
+   return prompter_punit_await_acc(menu->items, menu->count, accenter);
+}
+
+void prompter_pmenu_print(const PMenu *menu)
+{
+   prompter_punit_print_acc(menu->items, menu->count, global_accenter);
+}
+
+int prompter_pmenu_await(const PMenu *menu)
+{
+   return prompter_punit_await_acc(menu->items, menu->count, global_accenter);
+}
+
 
 /*
  * Erases console line and places cursor at left-most column.

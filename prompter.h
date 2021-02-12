@@ -41,7 +41,10 @@ typedef struct prompter_unit {
    int value;
 } PUnit;
 
-
+typedef struct prompter_menu {
+   const PUnit *items;
+   int count;
+} PMenu;
 
 /*
  * A PromptSet holds several bits of data
@@ -94,6 +97,11 @@ void prompter_punit_print_acc(const PUnit *units, int count, const Accenter *acc
 int prompter_punit_await_acc(const PUnit *units, int count, const Accenter *accenter);
 void prompter_punit_print(const PUnit *units, int count);
 int prompter_punit_await(const PUnit *units, int count);
+
+void prompter_pmenu_print_acc(const PMenu *menu, const Accenter *accenter);
+int prompter_pmenu_await_acc(const PMenu *menu, const Accenter *accenter);
+void prompter_pmenu_print(const PMenu *menu);
+int prompter_pmenu_await(const PMenu *menu);
 
 void prompter_reuse_line(void);
 
