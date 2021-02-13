@@ -50,64 +50,39 @@ typedef struct prompter_menu {
    int count;
 } PMenu;
 
-/*
- * A PromptSet holds several bits of data
- * to simplify the display and interpretation
- * of a set of prompt strings.
- */
-typedef struct prompter_set {
-   const char **prompts;
-   int *results;
-   int prompt_count;
-   Accenter *accenter;
-} PromptSet;
-
-
-char prompter_get_accented_letter_acc(const char *str,
-                                      const Accenter *accenter);
-
-void prompter_print_prompt_acc(const char *prompt, pr_bool accent,
-                               const Accenter *accenter);
-
-void prompter_print_prompts_acc(const char **prompts, int count_prompts,
-                                const Accenter *accenter);
-
-pr_bool prompter_extract_prompt_letter_acc(/*out*/ char *prompt_letter,
-                                           const char *prompt,
-                                           const Accenter *accenter);
-
-int prompter_await_prompt_acc(const char **prompts, int count_prompts,
-                              const Accenter *accenter);
+void prompter_reuse_line(void);
 
 int prompter_initialize_letter_array(int count, char **letters, char *buffer, int bufflen);
 
+char prompter_get_accented_letter_acc(const char *str, const Accenter *accenter);
+char prompter_get_accented_letter(const char *str);
+
 void prompter_fill_letter_array_acc(char **letters, int count, const char **prompts,
                                     const Accenter *accenter);
+void prompter_fill_letter_array(char **letters, int count, const char **prompts);
+
+void prompter_pmenu_fill_letter_array_acc(char **letters, const PMenu *menu, const Accenter *accenter);
+
+
+void prompter_print_prompt_acc(const char *prompt, pr_bool accent, const Accenter *accenter);
+void prompter_print_prompt(const char *prompt, pr_bool accent);
+
+void prompter_print_prompts_acc(const char **prompts, int count_prompts, const Accenter *accenter);
+void prompter_print_prompts(const char **prompts, int count_prompts);
+
+
+pr_bool prompter_extract_prompt_letter_acc(/*out*/ char *prompt_letter, const char *prompt,
+                                           const Accenter *accenter);
+pr_bool prompter_extract_prompt_letter(/*out*/ char *prompt_letter, const char *prompt);
 
 int prompter_await_prompt_acc(const char **prompts, int count_prompts, const Accenter *accenter);
-
-
-char prompter_get_accented_letter(const char *str);
-void prompter_print_prompt(const char *prompt, pr_bool accent);
-void prompter_print_prompts(const char **prompts, int count_prompts);
-pr_bool prompter_extract_prompt_letter(/*out*/ char *prompt_letter, const char *prompt);
-void prompter_fill_letter_array(char **letters, int count, const char **prompts);
 int prompter_await_prompt(const char **prompts, int count_prompts);
-
-void prompter_pset_print(const PromptSet *set);
-int prompter_pset_await(const PromptSet *set);
-
-void prompter_punit_print_acc(const PUnit *units, int count, const Accenter *accenter);
-int prompter_punit_await_acc(const PUnit *units, int count, const Accenter *accenter);
-void prompter_punit_print(const PUnit *units, int count);
-int prompter_punit_await(const PUnit *units, int count);
 
 void prompter_pmenu_print_acc(const PMenu *menu, const Accenter *accenter);
 int prompter_pmenu_await_acc(const PMenu *menu, const Accenter *accenter);
 void prompter_pmenu_print(const PMenu *menu);
 int prompter_pmenu_await(const PMenu *menu);
 
-void prompter_reuse_line(void);
 
 
 
