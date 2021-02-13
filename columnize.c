@@ -106,10 +106,11 @@ const void ** display_newspaper_columns(const CEIF *iface,
                                         int max_columns,
                                         int max_lines)
 {
+   int count = (int)(end - start);
+
    int wide, tall;
    get_screen_dimensions(&wide, &tall);
 
-   int count = (int)(end - start);
    int maxlen = columnize_get_max_len(iface, start, end);
 
    int colwidth = maxlen + gutter;
@@ -118,58 +119,57 @@ const void ** display_newspaper_columns(const CEIF *iface,
    if (max_columns && columns > max_columns)
       columns = max_columns;
 
-   int page_capacity = columns * (max_lines ? max_lines : tall);
-
    // Adjust stopping point if restricted by caller
    // preferences or page capacity
    const void **stop = end;
+
    if (max_lines)
    {
+      int page_capacity = columns * (max_lines ? max_lines : tall);
+
       if (count < page_capacity)
          stop = start + count;
       else
          stop = start + page_capacity;
    }
 
-   int lines;
+   int items_in_column;
 
    if (max_lines)
-      lines = max_lines;
+      items_in_column = max_lines;
    else
    {
-      lines = count / columns;
+      items_in_column = count / columns;
       // Extra line needed if not evenly divisible
       if (count % columns)
-         ++lines;
+         ++items_in_column;
    }
+
+   int line_counter = 0;
 
    const void **anchor_line = start;
    const void **ptr = start;
 
-   int counter = 0;
-   int line_counter = 1;
-
    while (ptr < stop)
    {
-      ++counter;
-      
       (*iface->print_cell)(stdout, *ptr, colwidth);
-      // skip ahead to neighboring string
-      ptr += lines;
+
+      // skip ahead to item in adjacent column
+      ptr += items_in_column;
 
       // If calcluated neighboring string is out-of-range,
       if (ptr >= stop)
       {
+         ++line_counter;
+
          // return pointer to string that belongs in left-most column,
          ptr = ++anchor_line;
          // then move to the left-most column for the next print.
          printf("\n");
 
          // We're done if we've gone past the final string on the left column
-         if (ptr >= start+lines)
+         if (ptr >= start + items_in_column)
             break;
-         else
-            ++line_counter;
       }
    }
 
@@ -207,23 +207,25 @@ const void ** display_parallel_columns(const CEIF *iface,
    if (max_columns && columns > max_columns)
       columns = max_columns;
 
-   const void **ptr = start;
+   // Adjust stopping point if restricted by caller
+   // preferences or page capacity
+   const void **stop = end;
 
    int lines = count / columns;
    if (count % columns)
       ++lines;
 
-   // Adjust stopping point if restricted by caller
-   // preferences or page capacity
-   const void **stop = end;
    if (max_lines && max_lines < lines)
    {
       lines = max_lines;
       stop = start + ( lines * columns );
    }
 
+   int line_counter = 0;
    int column = 0;
-   int line_counter = 1;
+   
+   const void **ptr = start;
+
    while (ptr < stop)
    {
       (*iface->print_cell)(stdout, *ptr, colwidth);
@@ -231,8 +233,10 @@ const void ** display_parallel_columns(const CEIF *iface,
       column = ((column+1) % columns);
       if (!column)
       {
-         printf("\n");
          ++line_counter;
+
+         printf("\n");
+         /* printf("<%d>\n", line_counter); */
       }
 
       ++ptr;
@@ -241,6 +245,7 @@ const void ** display_parallel_columns(const CEIF *iface,
    // If not enough entries, add extra lines to push first element to top-of-screen:
    while (line_counter++ < max_lines)
       printf("\n");
+      /* printf("-->%d<--\n", line_counter); */
 
    printf("\n");
 
