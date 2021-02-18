@@ -356,11 +356,12 @@ void columnize_print_progress(PPARAMS *params, const void **stop)
    int starting_index = PPARAMS_pointer_index(params, params->ptr);
    int ending_index = PPARAMS_pointer_index(params, stop);
 
-   printf("Page %d of %d (items %d to %d)",
+   printf("Page %d of %d (items %d to %d out of %d)",
           PPARAMS_current_page(params) + 1,
           PPARAMS_page_count(params),
           starting_index+1,
-          ending_index);
+          ending_index,
+          (int)(params->end - params->start));
 }
 
 void columnize_print_progress_line(PPARAMS *params, const void **stop)
