@@ -99,6 +99,7 @@ int PPARAMS_pointer_index(const PPARAMS *params, const void **ptr);
 const void** PPARAMS_move(PPARAMS *params, CPRD request);
 
 void columnize_print_progress(PPARAMS *params, const void **stop);
+void columnize_print_progress_line(PPARAMS *params, const void **stop);
 
 
 

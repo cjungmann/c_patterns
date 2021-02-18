@@ -356,11 +356,17 @@ void columnize_print_progress(PPARAMS *params, const void **stop)
    int starting_index = PPARAMS_pointer_index(params, params->ptr);
    int ending_index = PPARAMS_pointer_index(params, stop);
 
-   printf("Page %d of %d (items %d to %d).\n",
+   printf("Page %d of %d (items %d to %d)",
           PPARAMS_current_page(params) + 1,
           PPARAMS_page_count(params),
           starting_index+1,
           ending_index);
+}
+
+void columnize_print_progress_line(PPARAMS *params, const void **stop)
+{
+   columnize_print_progress(params, stop);
+   printf("\n");
 }
 
 /*
@@ -567,7 +573,7 @@ void columnize_string_array(const char **list, int list_count)
                                            params.columns_to_show,
                                            params.lines_to_show);
 
-      columnize_print_progress(&params, stop);
+      columnize_print_progress_line(&params, stop);
       prompter_print_prompts(legend_keys, legend_keys_count);
 
      recheck_user_response:
