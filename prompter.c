@@ -266,9 +266,12 @@ int prompter_pmenu_await_acc(const PMenu *menu, const Accenter *accenter)
    prompter_pmenu_fill_letter_array_acc(letters, menu, accenter);
 
    int index = await_keypress((const char **)letters, menu->count);
-   assert(index >=0 && index < menu->count);
+   assert(index < menu->count);
 
-   return menu->items[index].value;
+   if (index < 0)
+      return index;
+   else
+      return menu->items[index].value;
 }
 
 int prompter_pmenu_await(const PMenu *menu)
