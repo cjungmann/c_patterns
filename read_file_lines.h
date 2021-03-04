@@ -6,9 +6,9 @@ extern unsigned RFL_bufflen;
 
 // Using *bool* type to communicate the expected return value,
 // 0 for failure, non-zero for success.
-typedef int bool;
+typedef int rfl_bool;
 
-typedef bool (*line_user_f)(const char *start, const char *end, void *closure);
+typedef rfl_bool (*line_user_f)(const char *start, const char *end, void *closure);
 
 int read_handle_lines(int fh, line_user_f user, void *closure);
 int read_file_lines(const char *filepath, line_user_f user, void *closure);

@@ -171,7 +171,7 @@ void interpret_string_number(const char /*in*/ *start, const char /*in*/ *end,
 /**
  * Callback function for test case.
  */
-bool read_file_lines_user(const char *start, const char *end, void *closure)
+rfl_bool read_file_lines_user(const char *start, const char *end, void *closure)
 {
    const char *end_word;
    uint64_t   value;
