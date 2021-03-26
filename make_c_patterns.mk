@@ -54,6 +54,7 @@ CP_SOURCE_TARGETS != if [ ${CP_SOURCE_LINKS_NEEDED} -eq 1 ]; then echo ${CP_SOUR
 
 # Initiate the link-making
 CP_PREPARE_SOURCES: ${CP_LINK_PREREQS} ${CP_SOURCE_TARGETS}
+CP_Prepare_Sources: ${CP_LINK_PREREQS} ${CP_SOURCE_TARGETS}
 
 ${CP_NAMES}: c_patterns
 	@echo Making link from c_patterns to $@
