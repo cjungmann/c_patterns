@@ -12,6 +12,10 @@ Rather than including a Makefile, each source file will
 include a compile string in an EMACS *file local variables*
 line.  In EMACS, compile with `M-x compile`.
 
+Look at [this convenient tool](README_make.md) that provides a
+convenient means for incorporating these modules into other
+projects.
+
 - [Line-reading Function](README_read_file_lines.md)
   Collecting data from various sources usually requires processing
   files by line.  The main function, `read_file_lines` buffers
