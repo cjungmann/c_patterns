@@ -35,7 +35,7 @@ typedef void (*PT_cleaner)(PerfTest *perfTest);
  * @param perfTest  PerfTest instance to be extended with new time point
  * @return True for success, false for failure.  Failure caused by malloc failure.
  */
-typedef bool (*PT_add_point)(PerfTest *perfTest);
+typedef bool (*PT_add_point)(PerfTest *perfTest, void *data);
 
 /**
  * @brief Reports number of time points for allocating time array
@@ -82,12 +82,12 @@ struct PerfTest_s {
  * @brief Access to implementation functions through abstract interface
  * @{
  */
-void PerfTest_cleaner(PerfTest *pt)              { (*pt->cleaner)(pt); }
-bool PerfTest_add_point(PerfTest *pt)            { return (*pt->add_point)(pt); }
-int PerfTest_points_count(const PerfTest *pt)    { return (*pt->points_count)(pt); }
+void PerfTest_cleaner(PerfTest *pt)               { (*pt->cleaner)(pt); }
+bool PerfTest_add_point(PerfTest *pt, void *data) { return (*pt->add_point)(pt,data); }
+int PerfTest_points_count(const PerfTest *pt)     { return (*pt->points_count)(pt); }
 void PerfTest_get_points(const PerfTest *pt,
                         long *buff,
-                        int bufflen)             { (*pt->get_points)(pt,buff,bufflen); }
+                        int bufflen)              { (*pt->get_points)(pt,buff,bufflen); }
 /** @} end of MemberFunctionCallers */
 
 /**
@@ -168,7 +168,7 @@ void PT_Time_clean(PerfTest *perfTest)
 }
 
 /** @brief Implementation of PT_add_point */
-bool PT_Time_add_point(PerfTest *perfTest)
+bool PT_Time_add_point(PerfTest *perfTest, void *data)
 {
    PT_Time *this = (PT_Time*)perfTest;
 
@@ -292,7 +292,7 @@ void PT_Gettime_clean(PerfTest *perfTest)
 }
 
 /** @brief Implementation of PT_add_point */
-bool PT_Gettime_add_point(PerfTest *perfTest)
+bool PT_Gettime_add_point(PerfTest *perfTest, void *data)
 {
    PT_Gettime *this = (PT_Gettime*)perfTest;
 
@@ -451,17 +451,17 @@ void run_timer_test(PerfTest *pt, int factor)
 {
 
    double value = 1.0;
-   PerfTest_add_point(pt);
+   PerfTest_add_point(pt, NULL);
    for (int i=1; i<factor; ++i)
    {
       value *= (double)i;
-      PerfTest_add_point(pt);
+      PerfTest_add_point(pt, NULL);
    }
 
    printf("%d factorial is %f.\n", factor, value);
 
    // The final measurement is of the printf statement.
-   PerfTest_add_point(pt);
+   PerfTest_add_point(pt, NULL);
 
    int points_count = PerfTest_points_count(pt);
    if (points_count > 0)
