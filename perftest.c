@@ -245,6 +245,7 @@ void PT_Time_init(PT_Time *pt_time)
  * @defgroup PerfTest_Gettime \
  *    Timer implementation using the high-precision clock_gettime() f * @ingroup PerfTestImp
 unction.
+ * @ingroup PerfTestImp
  * @brief
  *    Using clock_gettime to get time intervals in nano-seconds
  *    (1 billionth of a second).
@@ -366,6 +367,82 @@ void PT_Gettime_init(PT_Gettime *pt_time)
 
 /** @} End of PerfTest_Gettime */
 
+/**
+ * @defgroup PerfTest_Gettime_stack \
+ *    Derived from PerfTest_Gettime, uses memory provided to add_point for list.
+unction.
+ * @ingroup PerfTestImp
+ * @{
+ */
+
+/** @brief Typedef for use as argument type */
+typedef struct PT_Gettime_stack_s PT_Gettime_stack;
+
+/**
+ * @brief Subclass declaration of abstract PerfTime
+ */
+struct PT_Gettime_stack_s {
+   PerfTest base;           ///< abstract base struct
+   int       points_count;  ///< number of time links in the chain
+   PT_GTLink *base_link;    ///< pointer to start of chain
+   PT_GTLink *last_link;    ///< pointer to end of chain (for efficient additions)
+};
+
+/** @brief Implementation of PT_cleaner */
+void PT_Gettime_stack_clean(PerfTest *perfTest)
+{
+   PT_Gettime_stack *this = (PT_Gettime_stack*)perfTest;
+   this->base_link = this->last_link = NULL;
+}
+
+/** @brief Implementation of PT_add_point */
+bool PT_Gettime_stack_add_point(PerfTest *perfTest, void *data)
+{
+   PT_Gettime_stack *this = (PT_Gettime_stack*)perfTest;
+
+   if (data)
+   {
+      PT_GTLink *link = (PT_GTLink*)data;
+
+      // Get time ASAP
+      clock_gettime(CLOCK_MONOTONIC, &link->time_point);
+      link->next = NULL;
+
+      // Add link to chain
+      if (this->last_link == NULL)
+         this->base_link = this->last_link = link;
+      else
+      {
+         this->last_link->next = link;
+         this->last_link = link;
+      }
+
+      ++this->points_count;
+
+      return true;
+   }
+
+   return false;
+}
+
+/**
+ * @brief "Constructor" of PT_Gettime_stack subclass
+ * @param pt_time   Uninitialized PT_Gettime_stack instance
+ */
+void PT_Gettime_stack_init(PT_Gettime_stack *pt_time)
+{
+   memset(pt_time, 0, sizeof(PT_Gettime_stack));
+   PerfTest *this = (PerfTest*)pt_time;
+   PerfTest_init(this,
+                 PT_Gettime_stack_clean,
+                 PT_Gettime_stack_add_point,
+                 PT_Gettime_points_count,
+                 PT_Gettime_get_points);
+}
+
+
+
+/** @} end PerfTest_Gettime_stack */
 
 #ifdef PERFTEST_MAIN
 
