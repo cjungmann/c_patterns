@@ -165,6 +165,8 @@ void PT_Time_clean(PerfTest *perfTest)
       free((void*)ptr);
       ptr = saved;
    }
+
+   this->base_link = this->last_link = NULL;
 }
 
 /** @brief Implementation of PT_add_point */
@@ -290,6 +292,8 @@ void PT_Gettime_clean(PerfTest *perfTest)
       free((void*)ptr);
       ptr = saved;
    }
+
+   this->base_link = this->last_link = NULL;
 }
 
 /** @brief Implementation of PT_add_point */
