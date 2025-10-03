@@ -525,8 +525,6 @@ void Numbered_PrintReport(int fd,
  * @param factor            factorial number to calculate.  Use this
  *                          to set the number of iterations in a
  *                          test.
- * @param units_per_second  to help format PT_Gettime output, which
- *                          tracks billionths of seconds
  */
 void run_timer_test(PerfTest *pt, int factor)
 {
@@ -561,6 +559,54 @@ void run_timer_test(PerfTest *pt, int factor)
 }
 
 
+/**
+ * @brief Run timer test with stack-based derivation of PT_Gettime
+ * @details
+ *    This function is a partial copy of run_timer_test,
+ *    with a locally-allocated PT_Gettime_stack object
+ *    and using alloca() to get memory to pass to the
+ *    add_point() function.
+ *
+ * @param factor            factorial number to calculate.  Use this
+ *                          to set the number of iterations in a
+ *                          test.
+ */
+#include <alloca.h>
+void run_timer_test_stack(int factor)
+{
+   PT_Gettime_stack pts;
+   PT_Gettime_stack_init(&pts);
+   PerfTest *pt = (PerfTest*)&pts;
+
+   double value = 1.0;
+   PerfTest_add_point(pt, alloca(sizeof(PT_GTLink)));
+   for (int i=1; i<factor; ++i)
+   {
+      value *= (double)i;
+      PerfTest_add_point(pt, alloca(sizeof(PT_GTLink)));
+   }
+
+   printf("%d factorial is %f.\n", factor, value);
+
+   // The final measurement is of the printf statement.
+   PerfTest_add_point(pt, alloca(sizeof(PT_GTLink)));
+
+   int points_count = PerfTest_points_count(pt);
+   if (points_count > 0)
+   {
+      long *points = (long*)malloc(points_count * sizeof(long));
+      if (points)
+      {
+         PerfTest_get_points(pt, points, points_count);
+         // Generic_PrintReport(STDOUT_FILENO, points, points_count);
+         Numbered_PrintReport(STDOUT_FILENO, points, points_count);
+         free(points);
+      }
+   }
+
+   PerfTest_cleaner(pt);
+}
+
 int main(int argc, const char **argv)
 {
    int factor = 10;
@@ -579,14 +625,25 @@ int main(int argc, const char **argv)
       }
    }
 
+   printf("Beginning PerfTest demo using \033[32;1mtime\033[39;22m, "
+          "one second resolution.\n");
    PT_Time pt_time;
    PT_Time_init(&pt_time);
    run_timer_test((PerfTest*)&pt_time, factor);
 
+   printf("\n");
+   printf("Beginning PerfTest demo using \033[32;1clock_gettime\033[39;22m, "
+          "one billionth of a second resolution.\n");
    PT_Gettime gt_time;
    PT_Gettime_init(&gt_time);
    run_timer_test((PerfTest*)&gt_time, factor);
 
+   printf("\n");
+   printf("Beginning PerfTest clock_gettime demo using \033[32;1mstack memory\033[39;22m.");
+   run_timer_test_stack(factor);
+   printf("\n");
+   printf("Beginning \033[32;1mSECOND\033[39;22m PerfTest clock_gettime demo using \033[32;1stack memory\033[39;22m.");
+   run_timer_test_stack(factor);
    return 0;
 }
 
@@ -607,7 +664,7 @@ int main(int argc, const char **argv)
  *    using both implementations on common data.
  * @note
  *    To build a PerfTest demonstration:  
- *    `gcc -std=c99 -o perftest perftest.c`
+ *    `gcc -std=c99 -DPERFTEST_MAIN -o perftest perftest.c`
  *
  *    In Emacs, use `M-x compile` to compile with warnings,
  *    debugging, and memory-checking enabled.  Refer to the
