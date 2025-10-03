@@ -165,6 +165,8 @@ void PT_Time_clean(PerfTest *perfTest)
       free((void*)ptr);
       ptr = saved;
    }
+
+   this->base_link = this->last_link = NULL;
 }
 
 /** @brief Implementation of PT_add_point */
@@ -245,6 +247,7 @@ void PT_Time_init(PT_Time *pt_time)
  * @defgroup PerfTest_Gettime \
  *    Timer implementation using the high-precision clock_gettime() f * @ingroup PerfTestImp
 unction.
+ * @ingroup PerfTestImp
  * @brief
  *    Using clock_gettime to get time intervals in nano-seconds
  *    (1 billionth of a second).
@@ -289,6 +292,8 @@ void PT_Gettime_clean(PerfTest *perfTest)
       free((void*)ptr);
       ptr = saved;
    }
+
+   this->base_link = this->last_link = NULL;
 }
 
 /** @brief Implementation of PT_add_point */
