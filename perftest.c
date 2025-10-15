@@ -226,6 +226,12 @@ void PerfTest_init(PerfTest *pt,
  * @ingroup PerfTest_Domain
  * @brief
  *    Examples of PerfTest implementations for use or to serve as programming models
+ * @details
+ *    There are X implementations:
+ *    1.  PT_Gettime  
+ *    2.  PT_Gettime_extmem  
+ *    3.  PT_Gettime_premem  
+ *    4.  PT_Gettime_premem_caller
  */
 
 /**
@@ -337,7 +343,7 @@ void PT_Gettime_getter(const PerfTest *pt, long *buff, int bufflen)
  * @brief Initialize a PT_Gettime instance
  * @param pt  PT_Gettime instance to be initialized
  */
-void PT_Gettime_init(PT_Gettime *pt)
+bool PT_Gettime_init(PT_Gettime *pt)
 {
    memset(pt, 0, sizeof(PT_Gettime));
    PerfTest_init((PerfTest*)pt,
@@ -345,6 +351,8 @@ void PT_Gettime_init(PT_Gettime *pt)
                  PT_Gettime_adder,
                  PT_Gettime_counter,
                  PT_Gettime_getter);
+
+   return true;
 }
 
 
@@ -418,7 +426,7 @@ bool PT_Gettime_extmem_adder(PerfTest *pt, void *data)
  * @brief Initialize a PT_Gettime_extmem instance
  * @param pt  PT_Gettime_extmem instance to be initialized
  */
-void PT_Gettime_extmem_init(PT_Gettime *pt)
+bool PT_Gettime_extmem_init(PT_Gettime *pt)
 {
    memset(pt, 0, sizeof(PT_Gettime_extmem));
    PerfTest_init((PerfTest*)pt,
@@ -426,10 +434,193 @@ void PT_Gettime_extmem_init(PT_Gettime *pt)
                  PT_Gettime_extmem_adder,
                  PT_Gettime_counter,
                  PT_Gettime_getter);
+   return true;
 }
 
 
 /** @} end of PT_Gettime_extmem */
+
+/**
+ * @defgroup PT_Gettime_premem \
+             Gettime Variation
+ * @ingroup PerfTest_Impl
+ * @brief Gettime variation that pre-allocates memory and distributes it as needed.
+ * @{
+ */
+
+typedef struct PT_Gettime_premem_s PT_Gettime_premem;
+
+struct PT_Gettime_premem_s {
+   PT_Gettime base;
+   // Memory pool management
+   PT_GTLink *pool;
+   PT_GTLink *pool_next;
+   PT_GTLink *pool_end;
+};
+
+/**
+ * @brief implementation of PerfTest::clean
+ * @details
+ *    This cleaner is necessary to clean up the malloced memory
+ *    pool.
+ */
+void PT_Gettime_premem_cleaner(PerfTest *pt)
+{
+   PT_Gettime_premem *this = (PT_Gettime_premem*)pt;
+   if (this->pool)
+   {
+      free(this->pool);
+      this->pool = this->pool_next = this->pool_end = NULL;
+   }
+   this->base.base_link = this->base.last_link = NULL;
+}
+
+/**
+ * @brief implementation of PerfTest::add_point
+ * @details
+ *    This is a complete implementation, without resorting to
+ *    reusing PT_Gettime_extmem because PT_Gettime_extmem
+ *    may disappear because it's kind of pointless with the
+ *    creation of this PerfTest variation.
+ */
+bool PT_Gettime_premem_adder(PerfTest *pt, void *data)
+{
+   bool retval = false;
+
+   PT_Gettime_premem *this = (PT_Gettime_premem*)pt;
+#ifdef PREMEM_SAFE
+   if (this->pool_next)
+   {
+#endif
+      retval = true;
+
+      PT_GTLink *link = this->pool_next;
+      clock_gettime(CLOCK_MONOTONIC, &link->time_point);
+
+      // Install link to the base
+      if (this->base.last_link == NULL)
+         this->base.base_link = this->base.last_link = link;
+      else
+      {
+         this->base.last_link->next = link;
+         this->base.last_link = link;
+      }
+
+      ++this->base.points_count;
+
+      // Prepare for next memory pull, disabling
+      // the next pull if we're out of memory:
+      ++this->pool_next;
+
+#ifdef PREMEM_SAFE
+      if (this->pool_next >= this->pool_end)
+         this->pool_next = NULL;
+   }
+#endif
+
+   return retval;
+}
+
+/**
+ * @brief Initialize with anticipated record count
+ * @details
+ *    The signature breaks from the standard of previous PT_xx_inits
+ *    in order to specify and preallocate memory.
+ * @param pt    uninitialized PT_Gettime_premem param
+ * @param count number of anticipated time-stamps to be saved
+ * @return True if memory could be allocated, False if malloc()
+ *         failed.
+ */
+bool PT_Gettime_premem_init(PT_Gettime_premem *pt, int count)
+{
+   memset(pt, 0, sizeof(PT_Gettime_premem));
+
+   pt->pool = (PT_GTLink*)malloc(count * sizeof(PT_GTLink));
+   if (pt->pool)
+   {
+      pt->pool_next = pt->pool;
+      pt->pool_end = pt->pool + count;
+
+      PerfTest_init((PerfTest*)pt,
+                    PT_Gettime_premem_cleaner,
+                    PT_Gettime_premem_adder,
+                    PT_Gettime_counter,
+                    PT_Gettime_getter);
+      return true;
+   }
+
+   return false;
+}
+
+/** @} End of PT_Gettime_premem */
+
+/**
+ * @defgroup PT_Gettime_premem_caller
+ *           Gettime variation using preallocated memory provided by
+ *           its caller
+ * @ingroup PerfTest_Impl
+ * @brief Implementation that allows the use of a block stack memory
+ * @details
+ *    After many timing tests, it has become apparent that the most
+ *    consistent and nearly always best performance is achieved by
+ *    a PT_Gettime_extmem that allocates from a block of stack memory.
+ *    Unexpectedly, the PT_Gettime_premem with an internally-allocated
+ *    pool of memory was not even as fast at PT_Gettime_extmem with a
+ *    pool of heap memory.
+ * @{
+ */
+
+typedef struct PT_Gettime_premem_s PT_Gettime_premem_caller;
+
+
+/**
+ * @brief implementation of PerfTest::clean
+ * @details
+ *    This cleaner is necessary to clean up pointer WITHOUT
+ *    freeing memory provided by the caller.
+ */
+void PT_Gettime_premem_caller_cleaner(PerfTest *pt)
+{
+   PT_Gettime_premem *this = (PT_Gettime_premem*)pt;
+   if (this->pool)
+   {
+      // NOT freeing caller-provided pool PT_Gettime_premem_cleaner
+
+      this->pool = this->pool_next = this->pool_end = NULL;
+   }
+   this->base.base_link = this->base.last_link = NULL;
+}
+
+size_t PT_Gettime_premem_caller_buffer_sizeof(int els)
+{
+   return sizeof(PT_GTLink) * els;
+}
+
+bool PT_Gettime_premem_caller_init(PT_Gettime_premem_caller *pt,
+                                   void *buffer,
+                                   int byte_len,
+                                   int els_len)
+{
+   bool retval = false;
+   if (byte_len >= sizeof(PT_GTLink) * els_len)
+   {
+      memset(pt, 0, sizeof(PT_Gettime_premem_caller));
+      pt->pool = (PT_GTLink*)buffer;
+      pt->pool_next = pt->pool;
+      pt->pool_end = pt->pool + els_len;
+
+      PerfTest_init((PerfTest*)pt,
+                    PT_Gettime_premem_caller_cleaner,
+                    PT_Gettime_premem_adder,
+                    PT_Gettime_counter,
+                    PT_Gettime_getter);
+      retval = true;
+   }
+
+   return retval;
+}
+
+/** @} PT_Gettime_premem_caller */
 
 #endif // PT_INCLUDE_IMPLEMENTATIONS
 
@@ -533,8 +724,8 @@ void generic_test_report(long *times, int times_count)
    long *ptr_times = times;
    long *end_times = ptr_times + times_count;
    long last = *ptr_times;
-   int count;
 
+#ifdef SHOW_LISTS
    printf("Time stamps:\n");
    while (ptr_times < end_times)
    {
@@ -542,13 +733,13 @@ void generic_test_report(long *times, int times_count)
       last = *ptr_times;
       ++ptr_times;
    }
+#endif
 
    int intervals_count = times_count - 1;
    long *intervals = (long*)malloc(sizeof(long) * intervals_count);
    if (intervals)
    {
       long *ptr_intervals = intervals;
-      long *end_intervals = ptr_intervals + intervals_count;
 
       ptr_times = times;
       last = *ptr_times++;
@@ -561,18 +752,22 @@ void generic_test_report(long *times, int times_count)
          ++ptr_intervals;
       }
 
+#ifdef SHOW_LISTS
+      long *end_intervals = ptr_intervals + intervals_count;
       ptr_intervals = intervals;
-      count = 0;
+      int count = 0;
       printf("\nUnsorted time intervals:\n");
       while (ptr_intervals < end_intervals)
       {
          printf("%3d: %ld.\n", ++count, *ptr_intervals);
          ++ptr_intervals;
       }
+#endif
 
       // Sort the intervals
       qsort(intervals, intervals_count, sizeof(long), ai_qsort_comp);
 
+#ifdef SHOW_LISTS
       ptr_intervals = intervals;
       count = 0;
       printf("\nSorted time intervals:\n");
@@ -581,6 +776,7 @@ void generic_test_report(long *times, int times_count)
          printf("%3d: %ld.\n", ++count, *ptr_intervals);
          ++ptr_intervals;
       }
+#endif
 
       double mean =   ai_calc_mean(intervals, intervals_count);
       double median = ai_calc_median(intervals, intervals_count);
@@ -592,6 +788,22 @@ void generic_test_report(long *times, int times_count)
       printf("  standard deviation   %f.\n", sigma);
 
       free(intervals);
+   }
+}
+
+void pt_test_report(PerfTest *pt)
+{
+   int points_count = PT_points_count(pt);
+   if (points_count)
+   {
+      long *buff = (long*)malloc(points_count * sizeof(long));
+      if (buff)
+      {
+         PT_get_points(pt, buff, points_count);
+         generic_test_report(buff, points_count);
+
+         free(buff);
+      }
    }
 }
 
@@ -612,35 +824,12 @@ void test_base(int iterations)
 
    PerfTest *pt = (PerfTest*)&ptgt;
 
-   // This method is consistently faster than using a
-   // 'while-loop' as in the commented-out section below:
+   // Get samples
    PT_add_point(pt, NULL);
    for (int i=0; i<iterations; ++i)
       PT_add_point(pt, NULL);
 
-   // Despite moving the index initialization BEFORE the
-   // first PT_add_point, this 'while-loop' method is slower
-   // that the 'for-loop':
-   // int i = 0;
-   // PT_add_point(pt, NULL);
-   // while (i < iterations)
-   // {
-   //    PT_add_point(pt, NULL);
-   //    ++i;
-   // }
-
-   int points_count = PT_points_count(pt);
-   if (points_count)
-   {
-      long *buff = (long*)malloc(points_count * sizeof(long));
-      if (buff)
-      {
-         PT_get_points(pt, buff, points_count);
-         generic_test_report(buff, points_count);
-
-         free(buff);
-      }
-   }
+   pt_test_report(pt);
 
    PT_clean(pt);
 }
@@ -658,28 +847,16 @@ void test_extmem_stack(int iterations)
    PT_Gettime_extmem pte;
    PT_Gettime_extmem_init(&pte);
 
+   long link_size = PT_BLOCK_SIZE(pte);
+
    PerfTest *pt = (PerfTest*)&pte;
 
-   if (iterations==0)
-      iterations = 10;
-
-   long link_size = PT_BLOCK_SIZE(pte);
+   // Get samples
    PT_add_point(pt, alloca(link_size));
    for (int i=0; i<iterations; ++i)
       PT_add_point(pt, alloca(link_size));
 
-   int points_count = PT_points_count(pt);
-   if (points_count)
-   {
-      long *buff = (long*)malloc(points_count * sizeof(long));
-      if (buff)
-      {
-         PT_get_points(pt, buff, points_count);
-         generic_test_report(buff, points_count);
-
-         free(buff);
-      }
-   }
+   pt_test_report(pt);
 
    // Don't call clean because the stack-allocated memory
    // will be released when the function returns:
@@ -699,28 +876,16 @@ void test_extmem_heap(int iterations)
    PT_Gettime_extmem pte;
    PT_Gettime_extmem_init(&pte);
 
+   long link_size = PT_BLOCK_SIZE(pte);
+
    PerfTest *pt = (PerfTest*)&pte;
 
-   if (iterations==0)
-      iterations = 10;
-
-   long link_size = PT_BLOCK_SIZE(pte);
+   // Get samples
    PT_add_point(pt, malloc(link_size));
    for (int i=0; i<iterations; ++i)
       PT_add_point(pt, malloc(link_size));
 
-   int points_count = PT_points_count(pt);
-   if (points_count)
-   {
-      long *buff = (long*)malloc(points_count * sizeof(long));
-      if (buff)
-      {
-         PT_get_points(pt, buff, points_count);
-         generic_test_report(buff, points_count);
-
-         free(buff);
-      }
-   }
+   pt_test_report(pt);
 
    // Use the standard clean up for add_points using whose second
    // argument is an individual malloced block of memory.
@@ -741,30 +906,18 @@ void test_extmem_heap_block(int iterations)
    PT_Gettime_extmem pte;
    PT_Gettime_extmem_init(&pte);
 
-   PerfTest *pt = (PerfTest*)&pte;
-
-   if (iterations==0)
-      iterations = 10;
-
+   // Allocate for +1 to accommodate pre-loop time-stamp
    PT_GTLink *links = (PT_GTLink*)malloc((iterations+1) * PT_BLOCK_SIZE(pte));
    PT_GTLink *lptr = links;
 
+   PerfTest *pt = (PerfTest*)&pte;
+
+   // Get samples
    PT_add_point(pt, lptr++);
    for (int i=0; i<iterations; ++i)
       PT_add_point(pt, lptr++);
 
-   int points_count = PT_points_count(pt);
-   if (points_count)
-   {
-      long *buff = (long*)malloc(points_count * sizeof(long));
-      if (buff)
-      {
-         PT_get_points(pt, buff, points_count);
-         generic_test_report(buff, points_count);
-
-         free(buff);
-      }
-   }
+   pt_test_report(pt);
 
    // Free the malloced block of PT_GTLink elements:
    free(links);
@@ -788,34 +941,118 @@ void test_extmem_heap_block(int iterations)
    PT_Gettime_extmem pte;
    PT_Gettime_extmem_init(&pte);
 
-   PerfTest *pt = (PerfTest*)&pte;
-
-   if (iterations==0)
-      iterations = 10;
-
+   // Allocate for +1 to accommodate pre-loop time-stamp
    PT_GTLink *links = (PT_GTLink*)alloca((iterations+1) * PT_BLOCK_SIZE(pte) );
    PT_GTLink *lptr = links;
 
+   PerfTest *pt = (PerfTest*)&pte;
+
+   // Get samples
    PT_add_point(pt, lptr++);
    for (int i=0; i<iterations; ++i)
       PT_add_point(pt, lptr++);
 
-   int points_count = PT_points_count(pt);
-   if (points_count)
-   {
-      long *buff = (long*)malloc(points_count * sizeof(long));
-      if (buff)
-      {
-         PT_get_points(pt, buff, points_count);
-         generic_test_report(buff, points_count);
-
-         free(buff);
-      }
-   }
+   pt_test_report(pt);
 
    // Don't call "clean" because it would attempt to free
    // stack-allocated memory:
    // PT_clean(pt);
+}
+
+/**
+ * @brief Run test using PT_Gettime_premem
+ */
+void test_premem(int iterations)
+{
+   PT_Gettime_premem ptp;
+
+   // Allocate for +1 to accommodate pre-loop time-stamp
+   if (PT_Gettime_premem_init(&ptp, iterations+1))
+   {
+      PerfTest *pt = (PerfTest*)&ptp;
+
+      // Get samples
+      PT_add_point(pt, NULL);
+      for (int i=0; i<iterations; ++i)
+         PT_add_point(pt, NULL);
+
+      pt_test_report(pt);
+
+      // Must call PT_clean to free links memory:
+      PT_clean(pt);
+   }
+}
+
+/**
+ * @brief Run test using PT_Gettime_premem_caller with heap memory
+ */
+void test_premem_caller_heap(int iterations)
+{
+   PT_Gettime_premem ptp;
+
+   // The initial time-stamp increases the stamp_count need by one:
+   int stamp_count = iterations + 1;
+
+   size_t buff_len = PT_Gettime_premem_caller_buffer_sizeof(stamp_count);
+   void *buffer = malloc(buff_len);
+   if (buffer)
+   {
+   // Allocate for +1 to accommodate pre-loop time-stamp
+      if (PT_Gettime_premem_caller_init(&ptp, buffer, buff_len, stamp_count))
+      {
+         PerfTest *pt = (PerfTest*)&ptp;
+
+         // Get samples
+         PT_add_point(pt, NULL);
+         for (int i=0; i<iterations; ++i)
+            PT_add_point(pt, NULL);
+
+         pt_test_report(pt);
+
+         // Technically, we don't have to call this because
+         // the stack memory will be released with the function
+         // return, which will also drop the PT_Gettime_premem_init
+         // as it goes out of scope.
+         PT_clean(pt);
+      }
+
+      free(buffer);
+   }
+}
+
+/**
+ * @brief Run test using PT_Gettime_premem_caller with stack memory
+ */
+void test_premem_caller(int iterations)
+{
+   PT_Gettime_premem ptp;
+
+   // The initial time-stamp increases the stamp_count need by one:
+   int stamp_count = iterations + 1;
+
+   size_t buff_len = PT_Gettime_premem_caller_buffer_sizeof(stamp_count);
+   void *buffer = alloca(buff_len);
+   if (buffer)
+   {
+   // Allocate for +1 to accommodate pre-loop time-stamp
+      if (PT_Gettime_premem_caller_init(&ptp, buffer, buff_len, stamp_count))
+      {
+         PerfTest *pt = (PerfTest*)&ptp;
+
+         // Get samples
+         PT_add_point(pt, NULL);
+         for (int i=0; i<iterations; ++i)
+            PT_add_point(pt, NULL);
+
+         pt_test_report(pt);
+
+         // Technically, we don't have to call this because
+         // the stack memory will be released with the function
+         // return, which will also drop the PT_Gettime_premem_init
+         // as it goes out of scope.
+         PT_clean(pt);
+      }
+   }
 }
 
 
@@ -824,6 +1061,28 @@ void test_extmem_heap_block(int iterations)
 
 
 #ifdef PERFTEST_MAIN
+
+#include <sys/resource.h>   // for setpriority()
+#include <errno.h>          // to print failure status for setpriority
+
+void print_description(const char *implementation,
+                       const char *alloc_source,      ///< stack or heap
+                       const char *alloc_type,        ///< individual or from pool
+                       int iterations,
+                       bool pause_after)
+{
+   printf("Executed \033[32;1m%d\033[39;22m iterations "
+          "with implementation \033[32;1m%s\033[39;22m, "
+          "link memory from \033[32;1m%s\e[39;22m allocation "
+          "using \033[32;1m%s\e[39;22m memory\n",
+          iterations,
+          implementation,
+          alloc_source,
+          alloc_type);
+
+   if (pause_after)
+      getchar();
+}
 
 
 int main(int argc, const char **argv)
@@ -837,33 +1096,39 @@ int main(int argc, const char **argv)
          iterations = argiter;
    }
 
+
+   bool pause_between = false;
+
+   printf("\033[2J\033[H");
+
+   if (setpriority(PRIO_PROCESS, 0, 19) == -1)
+      printf("Failed to set the priority, '%s'\n", strerror(errno));
+   else
+      printf("Set the highest available priority.\n");
+
    test_base(iterations);
-   printf("Just completed standard test of %d iterations.\n", iterations);
+   print_description("PT_Gettime", "heap", "individual", iterations, pause_between);
 
-   getchar();
    test_extmem_heap(iterations);
-   printf("Just completed external mem test with "
-          "HEAP memory for %d iterations.\n",
-          iterations);
+   print_description("PT_Gettime_extmem", "heap", "individual", iterations, pause_between);
 
-   getchar();
    test_extmem_stack(iterations);
-   printf("Just completed external mem test with "
-          "STACK memory for %d iterations.\n",
-          iterations);
+   print_description("PT_Gettime_extmem", "stack", "individual", iterations, pause_between);
 
-   getchar();
    test_extmem_heap_block(iterations);
-   printf("Just completed external mem test with a BLOCK "
-          "of HEAP memory for %d iterations.\n",
-          iterations);
+   print_description("PT_Gettime_extmem", "heap", "pool", iterations, pause_between);
 
-   getchar();
    test_extmem_stack_block(iterations);
-   printf("Just completed external mem test with a BLOCK "
-          "of STACK memory for %d iterations.\n",
-          iterations);
+   print_description("PT_Gettime_extmem", "stack", "pool", iterations, pause_between);
 
+   test_premem(iterations);
+   print_description("PT_Gettime_premem", "heap", "pool", iterations, pause_between);
+
+   test_premem_caller(iterations);
+   print_description("PT_Gettime_premem_caller_heap", "heap", "pool", iterations, pause_between);
+
+   test_premem_caller(iterations);
+   print_description("PT_Gettime_premem_caller", "stack", "pool", iterations, pause_between);
    return 0;
 }
 
