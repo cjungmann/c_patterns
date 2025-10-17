@@ -74,30 +74,19 @@ void ltoa_recursive_copy(long value,   /**<
  *    value will still be the buffer length needed to
  *    create the long int translation.
  *
+ * @param value    long value to convert to string
+ * @param base     number base for conversion.  Allowed
+ *                 values from 2 to 36, using base 10
+ *                 for an out-of-range @b base value.
+ * @param buffer   buffer to which the string will be written
+ * @param bufflen  number of chars in @b buffer.
+ *
  * @return Length of buffer needed to print the number.
  */
-int ltoa(long value,   /**< value to convert to a string */
-         int base,     /**<
-                        * number base to use.  Allowed base values are
-                        * from 2 through 36.  Base values outside the
-                        * permitted range will revert to base 10.
-                        */
-         char *buffer, /**<
-                        * Pointer to buffer to which the string will
-                        * be written.  It must be at least 1-character
-                        * long, but ideally should be long enough to
-                        * contain all the digits.
-                        *
-                        * No translation will happen if this value
-                        * is NULL.
-                        */
-         int bufflen   /**<
-                        * Number of chars in the @b buffer
-                        *
-                        * No translation will happen if this value
-                        * is less than 2.
-                        **/
-   )
+int ltoa(long value,
+         int base,
+         char *buffer,
+         int bufflen)
 {
    if (base==0 || base > 36)
       base = 10;
@@ -146,13 +135,14 @@ int ltoa(long value,   /**< value to convert to a string */
 #include <time.h>      // for time() to seed random number, timespec
 
 // c_patterns/perftest.c for timing:
-#define PT_INCLUDE_IMPLEMENATAIONS
-#define PT_INCLUDE_GENERIC_TEST_REPORT
+#define PT_INCLUDE_IMPLEMENTATIONS
+#define PT_INCLUDE_RESULTS_REPORT
 #include "perftest.c"
 
 #include <limits.h>
 #include <stdbool.h>
 #include <alloca.h>
+
 
 /**
  * @defgroup TestingGroups
@@ -197,20 +187,23 @@ void run_timed_test(const long *lvals, int vals_count, LPRINTER prntr)
    // mark the array ending
    const long *end = lvals + vals_count;
 
-   PT_Gettime_extmem pte;
-   PerfTest *pt = (PerfTest*)&pte;
-   PT_GTLink *links = (PT_GTLink*)alloca((vals_count+1) * PT_BLOCK_SIZE(ptr));
-   PT_GTLink *lptr = links;
+   int intervals_count = vals_count + 1;
+   PT_Gettime_premem pte;
+   PT_Gettime_premem_init(&pte, intervals_count);
 
-   PT_add_point(pt, *lptr++);
+   PerfTest *pt = (PerfTest*)&pte;
+
+   PT_add_point(pt, NULL);
    while (lvals < end)
    {
       (*prntr)(*lvals);
-      PT_add_point(pt, *lptr++);
+      PT_add_point(pt, NULL);
       ++lvals;
    }
 
+   pt_test_report(pt);
 
+   PT_clean(pt);
 }
 
 void compare_snprintf_ltoa(long *lvals, int len)
@@ -363,5 +356,6 @@ int main(int argc, const char **argv)
 /* compile-command: "gcc           \*/
 /*   -std=c99 -Wall -Werror -ggdb  \*/
 /*   -fsanitize=address            \*/
+/*   -lm                           \*/
 /*   -o ltoa ltoa.c"                */
 /* End:                             */
