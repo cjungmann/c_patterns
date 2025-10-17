@@ -42,12 +42,60 @@ void PerfTest_init(PerfTest *pt,
    pt->get_points = points_getter;
 }
 
+/**
+ * @defgroup Macro_Enabled \
+ *           PerfTest utilities enabled via pre-include macros
+ */
+
+/**
+ * @defgroup ME_Inits \
+ *           Initialization functions for the builtin PerfTest records.
+ * @ingroup Macro_Enabled
+ * @brief
+ *    Initialization functions for each PerfTest recorder;
+ * @details
+ *    Enable the PerfTest implmentations with macro
+ *    **PT_INCLUDE_IMPLEMENTATIONS** before including *perftest.c*
+ *
+ *    The following functions initialize the PerfTest record matching
+ *    the type of the first parameter.  Different memory management methods
+ *    dictate the variation in the parameter lists.
+ * @{
+ * @fn bool PT_Gettime_init(PT_Gettime *pt);
+ * @fn bool PT_Gettime_extmem_init(PT_Gettime *pt);
+ * @fn bool PT_Gettime_premem_init(PT_Gettime_premem *pt, int count);
+ * @fn bool PT_Gettime_premem_caller_init(PT_Gettime_premem_caller *pt, \
+ *                                  void *buffer,                       \
+ *                                  int byte_len,                       \
+ *                                  int els_len);
+ * @}
+ */
+
+/**
+ * @defgroup ME_Reporter \
+ *           Prototype of builtin times report including statistics
+ * @brief
+ *    Builtin report generator
+ * @details
+ *    Enable **pt_test_report** to generate a report from any of
+ *    the PerfTest implemenataions by including macro definition
+ *    **PT_INCLUDE_RESULTS_REPORT** before including *perftest.c*.
+ * @{
+ */
+void pt_test_report(PerfTest *pt);
+/** @} ME_Reporter */
+
+
+
+
+
+
 #ifdef PT_INCLUDE_ALL
 #define PT_INCLUDE_TESTS
 #endif
 
 #ifdef PT_INCLUDE_TESTS
-#define PT_INCLUDE_GENERIC_TEST_REPORT
+#define PT_INCLUDE_RESULTS_REPORT
 #define PT_INCLUDE_IMPLEMENTATIONS
 #endif
 
@@ -635,7 +683,7 @@ bool PT_Gettime_premem_caller_init(PT_Gettime_premem_caller *pt,
  *   Starting with the standard implementation PT_Gettime,
  */
 
-#ifdef PT_INCLUDE_GENERIC_TEST_REPORT
+#ifdef PT_INCLUDE_RESULTS_REPORT
 
 #include <stdio.h>   // for printf in generic_test_report()
 #include <alloca.h>  // for alloca() in extmem_stack_test()
@@ -778,14 +826,21 @@ void generic_test_report(long *times, int times_count)
       }
 #endif
 
+      long minval = *intervals;
+      long maxval = *(intervals + intervals_count - 1);
       double mean =   ai_calc_mean(intervals, intervals_count);
       double median = ai_calc_median(intervals, intervals_count);
       double sigma =  ai_calc_sigma(intervals, intervals_count);
 
-      printf("\nFor this sample of intervals:\n");
-      printf("  mean                 %f.\n", mean);
-      printf("  median               %f.\n", median);
-      printf("  standard deviation   %f.\n", sigma);
+      printf("\nThis sample of "
+             "\033[32;1m%d\033[39;22m"
+             " intervals.\n",
+             intervals_count);
+
+      printf("  range                %ld to %ld\n", minval, maxval);
+      printf("  mean                 %f\n", mean);
+      printf("  median               %f\n", median);
+      printf("  standard deviation   %f\n", sigma);
 
       free(intervals);
    }
@@ -807,7 +862,7 @@ void pt_test_report(PerfTest *pt)
    }
 }
 
-#endif // PT_INCLUDE_GENERIC_TEST_REPORT
+#endif // PT_INCLUDE_RESULTS_REPORT
 
 #ifdef PT_INCLUDE_TESTS
 
@@ -1066,19 +1121,25 @@ void test_premem_caller(int iterations)
 #include <errno.h>          // to print failure status for setpriority
 
 void print_description(const char *implementation,
-                       const char *alloc_source,      ///< stack or heap
-                       const char *alloc_type,        ///< individual or from pool
+                       const char *alloc_type,          ///< stack or heap
+                       const char *alloc_source,        ///< internal or external
+                       const char *alloc_distribution,  ///< individual or from pool
                        int iterations,
                        bool pause_after)
 {
-   printf("Executed \033[32;1m%d\033[39;22m iterations "
-          "with implementation \033[32;1m%s\033[39;22m, "
-          "link memory from \033[32;1m%s\e[39;22m allocation "
-          "using \033[32;1m%s\e[39;22m memory\n",
-          iterations,
+   printf("Test used the "
+          "\033[36;1m%s\e[39;22m"
+          " implementation with "
+          "\033[36;1m%s\e[39;22m"
+          " memory allocated from "
+          "\033[36;1m%s\e[39;22m"
+          " sources "
+          "\033[36;1m%s\e[39;22m"
+          ".\n",
           implementation,
           alloc_source,
-          alloc_type);
+          alloc_type,
+          alloc_distribution);
 
    if (pause_after)
       getchar();
@@ -1107,28 +1168,28 @@ int main(int argc, const char **argv)
       printf("Set the highest available priority.\n");
 
    test_base(iterations);
-   print_description("PT_Gettime", "heap", "individual", iterations, pause_between);
+   print_description("PT_Gettime", "heap", "internal", "individually", iterations, pause_between);
 
    test_extmem_heap(iterations);
-   print_description("PT_Gettime_extmem", "heap", "individual", iterations, pause_between);
+   print_description("PT_Gettime_extmem", "heap", "external", "individually", iterations, pause_between);
 
    test_extmem_stack(iterations);
-   print_description("PT_Gettime_extmem", "stack", "individual", iterations, pause_between);
+   print_description("PT_Gettime_extmem", "stack", "external", "individually", iterations, pause_between);
 
    test_extmem_heap_block(iterations);
-   print_description("PT_Gettime_extmem", "heap", "pool", iterations, pause_between);
+   print_description("PT_Gettime_extmem", "heap", "external", "from a pool", iterations, pause_between);
 
    test_extmem_stack_block(iterations);
-   print_description("PT_Gettime_extmem", "stack", "pool", iterations, pause_between);
+   print_description("PT_Gettime_extmem", "stack", "external", "from a pool", iterations, pause_between);
 
    test_premem(iterations);
-   print_description("PT_Gettime_premem", "heap", "pool", iterations, pause_between);
+   print_description("PT_Gettime_premem", "heap", "internal", "from a pool", iterations, pause_between);
 
    test_premem_caller(iterations);
-   print_description("PT_Gettime_premem_caller_heap", "heap", "pool", iterations, pause_between);
+   print_description("PT_Gettime_premem_caller_heap", "external", "heap", "from a pool", iterations, pause_between);
 
    test_premem_caller(iterations);
-   print_description("PT_Gettime_premem_caller", "stack", "pool", iterations, pause_between);
+   print_description("PT_Gettime_premem_caller", "external", "stack", "from a pool", iterations, pause_between);
    return 0;
 }
 
