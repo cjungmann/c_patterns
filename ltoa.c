@@ -3,6 +3,11 @@
  * @brief Implementation of a ltoa() function with comparisons to other methods.
  */
 
+#include <alloca.h>
+#include <assert.h>
+#include <string.h>  // for strncpy
+#include <limits.h>  // for LONG_MAX
+
 /**
  * @defgroup MainContent
  * @brief Function group that performs the long-to-string conversion
@@ -24,29 +29,16 @@
  *    output string in the appropriate order.  By tracking the end
  *    character, we safely remain within the bounds of the allocated
  *    memory.
+ * @param value    value from which the least significant digit will
+ *                 be written as a number character.
+ * @param base     number base in which the output will be written
+ * @param ptr      pointer where the next number character should be
+ *                 written
+ * @param end      pointer to last permitted address for writing the
+ *                 number variables.  The '\0' terminator will be
+ *                 applied by the function that started the recursion.
  */
-void ltoa_recursive_copy(long value,   /**<
-                                        * value from which the least significant
-                                        * digit will be extracted, and during
-                                        * recursion, the number from which the
-                                        * least significant digit wasnn discarded
-                                        * through division by @b base.
-                                        */
-                         int base,     /**< See #ref ltoa::base */
-                         char **ptr,   /**<
-                                        * Pointer to address of next character to
-                                        * print.  The address is used and incremented
-                                        * upon return from recursion, resulting in the
-                                        * last-acquired, most significant digit being
-                                        * printed at the front of the string.
-                                        */
-                         char *end    /**<
-                                       * pointer to last permitted address for
-                                       * printing digits.  The '\0' terminator will
-                                       * be applied by the caller that initiated the
-                                       * recursion.
-                                       */
-   )
+void ltoa_recursive_copy(unsigned long value, int base, char **ptr, char *end)
 {
    if (value > 0)
    {
@@ -64,7 +56,7 @@ void ltoa_recursive_copy(long value,   /**<
 }
 
 /**
- * @brief Safely converts a long integer into a string.
+ * @brief Uses recursion to safely converts a long integer into a string.
  * @details
  *    This is the featured function.  If you copy it for use,
  *    don't forget to copy @ref ltoa_recursive_copy with it.
@@ -83,23 +75,38 @@ void ltoa_recursive_copy(long value,   /**<
  *
  * @return Length of buffer needed to print the number.
  */
-int ltoa(long value,
-         int base,
-         char *buffer,
-         int bufflen)
+int ltoa_recursive(long value,
+                   int base,
+                   char *buffer,
+                   int bufflen)
 {
-   if (base==0 || base > 36)
+   if (base <= 0 || base > 36)
       base = 10;
 
-   int negative = value < 0;
-   if (negative)
-      value = -value;
+   unsigned long uvalue;
+   int negative = 0;
+   int required_length;
+   if (value == 0)
+   {
+      required_length = 2;
+      uvalue = 0;
+   }
+   else
+   {
+      if (value < 0)
+      {
+         negative = 1;
+         uvalue = -value;
+      }
+      else
+         uvalue = value;
 
-   // Required length is the return value regardless
-   // of buffer size (like snprintf)
-   int required_length = negative ? 2 : 1;
-   for (long lval = value; lval > 0; lval /= base)
-      ++required_length;
+      // Required length is the return value regardless
+      // of buffer size (like snprintf)
+      required_length = negative ? 2 : 1;
+      for (unsigned long lval = uvalue; lval > 0; lval /= base)
+         ++required_length;
+   }
 
    // Bufflen must be at least 1 to contain the NULL terminator
    if (buffer && bufflen > 1)
@@ -111,11 +118,182 @@ int ltoa(long value,
       if (negative)
          *ptr++ = '-';
 
-      ltoa_recursive_copy(value, base, &ptr, end);
+      ltoa_recursive_copy(uvalue, base, &ptr, end);
       *ptr = '\0';
    }
 
    return required_length;
+}
+
+
+/**
+ * @brief
+ *    Implementation of ltoa function using a loop instead of recursion
+ *
+ * @details
+ *    Like snprintf, this function always returns the length of the
+ *    conversion, whether or not the conversion is completed.  One
+ *    valid strategy is to call the function twice, first with a NULL
+ *    @b buffer value to get the length needed, then call a second
+ *    time with a buffer that had been allocated with the information
+ *    provided by the first call.
+ *
+ * @param value    long value to be converted to a string
+ * @param base     number base for conversion.  Allowed
+ *                 values from 2 to 36, using base 10
+ *                 for an out-of-range @b base value.
+ * @param buffer   buffer to which output should be written
+ * @param bufflen  length of @b buffer in bytes
+ *
+ * @return the number of characters needed to fully express
+ *         the long @b value in the number @base specified
+ */
+int ltoa_loop(long value, int base, char *buffer, int bufflen)
+{
+   if (base <= 0 || base > 36)
+      base = 10;
+
+   unsigned long uvalue;
+   int negative = 0;
+   int required_length;
+   if (value == 0)
+   {
+      required_length = 2;
+      uvalue = 0;
+   }
+   else
+   {
+      if (value < 0)
+      {
+         negative = 1;
+         uvalue = -value;
+      }
+      else
+         uvalue = value;
+
+      // Required length is the return value regardless
+      // of buffer size (like snprintf)
+      required_length = negative ? 2 : 1;
+      for (unsigned long lval = uvalue; lval > 0; lval /= base)
+         ++required_length;
+   }
+
+   // Bufflen must be at least 1 to contain the NULL terminator
+   if (buffer && bufflen > 1)
+   {
+      char work_digit;
+
+      // Prepare working memory and pointers into it
+      char *work_buffer = (char*)alloca(required_length);
+      char *ptr_digit = work_buffer + required_length-1;
+      *ptr_digit-- = '\0';
+
+      while (uvalue > 0)
+      {
+         // Since we've calculated exactly how many characters will be
+         // needed, this condition is redundant, assertion for safety:
+         assert(ptr_digit >= work_buffer);
+
+         work_digit = uvalue % base;
+         if (work_digit < 10)
+            work_digit += '0';
+         else
+            work_digit += ('A' - 10);
+
+         *ptr_digit = work_digit;
+
+         --ptr_digit;
+         uvalue /= base;
+      }
+
+      if (negative)
+      {
+         // Since we've calculated exactly how many characters will be
+         // needed, this condition is redundant, assertion for safety:
+         assert(ptr_digit >= work_buffer);
+
+         *ptr_digit-- = '-';
+      }
+
+      strncpy(buffer, work_buffer, bufflen);
+   }
+
+   return required_length;
+}
+
+/**
+ * @brief
+ *    Implementation of ltoa function reusing a static buffer for each call
+ *
+ * @details
+ *    This function returns the string result, a pointer into the
+ *    static buffer.  Since digits of an integer value are deciphered
+ *    from least to most significant digits, the numbers are written
+ *    to the buffer starting at the end and working backwards.  When
+ *    finished translation, the pointer to the last-written digit is
+ *    returned as the _answer_.
+ *
+ *    Note that since this function is working with and returning
+ *    a static buffer, there is no need for the calling function to
+ *    provide a buffer.
+ *
+ * @param value    long value to be converted to a string
+ * @param base     number base for conversion.  Allowed
+ *                 values from 2 to 36, using base 10
+ *                 for an out-of-range @b base value.
+ *
+ * @return the number of characters needed to fully express
+ *         the long @b value in the number @base specified
+ */
+const char *ltoa_instant(long value, int base)
+{
+   // Maximum length calculated for binary expression with a
+   // termination '\0' AND possibly a sign character for a
+   // negative value.
+   //
+   // Zero entire buffer to ensure final, string-terminating char,
+   // is '\0', then we never have to touch it.
+   static char buffer[2 + sizeof(long)*8] = { 0 };
+   static char *buffend = buffer + sizeof(buffer) - 2;
+
+   // This will always point to the next unconverted position.
+   // Add 1 back to the address when returning to point to the
+   // start of the converted string.
+   char *cur_digit = buffend - 1;
+
+   if (base <= 0 || base > 36)
+      base = 10;
+
+   if (value == 0)
+      *cur_digit-- = '0';
+   else
+   {
+      int negative = value < 0;
+
+      unsigned long uvalue;
+      if (negative)
+         uvalue = -value;
+      else
+         uvalue = value;
+
+      while (uvalue > 0)
+      {
+         assert(cur_digit >= buffer);
+         char cval = uvalue % base;
+         if (cval < 10)
+            cval += '0';
+         else
+            cval += ('A' - 10);
+
+         *cur_digit-- = cval;
+         uvalue /= base;
+      }
+
+      if (negative)
+         *cur_digit-- = '-';
+   }
+
+   return cur_digit + 1;
 }
 
 /** @} end of MainContent */
@@ -149,8 +327,8 @@ int ltoa(long value,
  * @brief Group of function groups with varying testing strategies
  * @details
  *    There are groups of functions that do performance testing
- *    on my `ltoa` function compared with the C library function
- *    `snprintf`, which is the builtin way to do it.
+ *    on my `ltoa` function variations compared with the C library
+ *    function `snprintf`, which is the builtin way to do it.
  */
 
 /**
@@ -161,12 +339,20 @@ int ltoa(long value,
  *    Each conversion measures and allocates memory for its conversion.
  *    This strategy allocates exactly the required amount of memory
  *    for each conversion to perform memory-safe conversions.
+ *
+ *    The conversion functions neither use nor save the conversion
+ *    results.
  * @{
  */
 
+/** Typedef with which @ref run_timed_test runs convert functions */
 typedef void (*LPRINTER)(long value);
 
-void print_with_snprintf(long value)
+/**
+ * @brief Wrapper around long to string conversion using snprintf
+ * @param value   value to convert
+ */
+void convert_with_snprintf(long value)
 {
    int len = snprintf(NULL, 0, "%ld", value);
    char *buff = (char*)alloca(len);
@@ -174,14 +360,51 @@ void print_with_snprintf(long value)
    snprintf(buff, len, "%ld", value);
 }
 
-void print_with_ltoa(long value)
+/**
+ * @brief Wrapper around long to string conversion function that uses recursion
+ * @param value   value to convert
+ */
+void convert_with_ltoa_recursive(long value)
 {
-   int len = ltoa(value, 10, NULL, 0);
+   int len = ltoa_recursive(value, 10, NULL, 0);
    char *buff = (char*)alloca(len);
 
-   ltoa(value, 10, buff, len);
+   ltoa_recursive(value, 10, buff, len);
 }
 
+/**
+ * @brief Wrapper around long to string conversion function that uses a loop
+ * @param value   value to convert
+ */
+void convert_with_ltoa_loop(long value)
+{
+   int len = ltoa_loop(value, 10, NULL, 0);
+   char *buff = (char*)alloca(len);
+
+   ltoa_loop(value, 10, buff, len);
+}
+
+/**
+ * @brief Wrapper around long to string conversion function that uses a loop
+ * @param value   value to convert
+ */
+void convert_with_ltoa_instant(long value)
+{
+   ltoa_instant(value, 10);
+}
+
+/**
+ * @brief Call the function pointer to execute the test
+ * @details
+ *    For each of the previously generated long values in the
+ *    @b lvals array, this function records how long it takes to
+ *    run the function of the function pointer, printing a
+ *    statistics report of the series of timings.
+ *
+ * @param lvals       array of long values
+ * @param vals_count  number of long values in the array
+ * @param prntr       pointer to wrapper function to test
+ */
 void run_timed_test(const long *lvals, int vals_count, LPRINTER prntr)
 {
    // mark the array ending
@@ -206,84 +429,38 @@ void run_timed_test(const long *lvals, int vals_count, LPRINTER prntr)
    PT_clean(pt);
 }
 
-void compare_snprintf_ltoa(long *lvals, int len)
+/**
+ * @brief
+ *    Calls each of the conversion timer functions with the same
+ *    set of long values.
+ * @param  lvals    array of long values to test with each timer function
+ * @param  len      number of long values in the @b lvals array
+ */
+void compare_conversion_strategies(long *lvals, int len)
 {
-   printf("Begin timed stringify test of %d values using %s.\n",
-          len, "ltoa");
-   run_timed_test(lvals, len, print_with_ltoa);
+   printf("\nTime %d conversions of various long values using "
+          "\033[32;1m%s\e[39;22m\n",
+          len, "ltoa_recursive");
+   run_timed_test(lvals, len, convert_with_ltoa_recursive);
 
-   printf("Begin timed stringify test of %d values using %s.\n",
+   printf("\nTime %d conversions of various long values using "
+          "\033[32;1m%s\e[39;22m\n",
+          len, "ltoa_loop");
+   run_timed_test(lvals, len, convert_with_ltoa_loop);
+
+   printf("\nTime %d conversions of various long values using "
+          "\033[32;1m%s\e[39;22m\n",
+          len, "ltoa_instant");
+   run_timed_test(lvals, len, convert_with_ltoa_instant);
+
+   printf("\nTime %d conversions of various long values using "
+          "\033[32;1m%s\e[39;22m\n",
           len, "snprintf");
-   run_timed_test(lvals, len, print_with_snprintf);
+   run_timed_test(lvals, len, convert_with_snprintf);
 }
 
 /** @} end of group Method_NewMemory */
 
-/**
- * @ingroup TestingGroups
- * @defgroup Method_ReuseMemory
- * @brief A large-enough buffer is preemptively allocated to be reused for each conversion.
- * @details
- *    A block of memory is allocated that can hold the string
- *    representation of thelargest possible long value, and that
- *    buffer is passed to a version of conversion functions that
- *    will use the shared memory.  This removes the memory
- *    allocation step in the conversion, and thus we can compare
- *    the cost of memory allocation on the overall process time.
- * @{
- */
-
-typedef void (*LPRINTER_B)(long value, char *buffer, int bufflen);
-
-void print_with_snprintf_buff(long value, char *buffer, int bufflen)
-{
-   snprintf(buffer, bufflen, "%ld", value);
-}
-
-void print_with_ltoa_buff(long value, char *buffer, int bufflen)
-{
-   ltoa(value, 10, buffer, bufflen);
-}
-
-void run_timed_test_buffer(const long *lvals,
-                           int vals_count,
-                           char *buffer,
-                           int bufflen,
-                           LPRINTER_B prntr)
-{
-   // Mark the array ending
-   const long *end = lvals + vals_count;
-
-   struct timespec ts_start, ts_end;
-   clock_gettime(CLOCK_MONOTONIC, &ts_start);
-   while (lvals < end)
-   {
-      (*prntr)(*lvals, buffer, bufflen);
-      ++lvals;
-   }
-   clock_gettime(CLOCK_MONOTONIC, &ts_end);
-
-   printf("Run time was %ld time units.\n", ts_end.tv_nsec - ts_start.tv_nsec);
-}
-
-void compare_snprintf_ltoa_buffer(long *lvals, int len)
-{
-   // Prepare buffer than can handle the largest possible
-   // long value and allow all calls to use it
-   int max_len = ltoa(LONG_MAX, 10, NULL, 0);
-   char *buffer = (char*)alloca(max_len);
-
-   printf("Begin timed stringify test of %d values using %s.\n",
-          len, "ltoa");
-   run_timed_test_buffer(lvals, len, buffer, max_len, print_with_ltoa_buff);
-
-   printf("Begin timed stringify test of %d values using %s.\n",
-          len, "snprintf");
-   run_timed_test_buffer(lvals, len, buffer, max_len, print_with_snprintf_buff);
-}
-
-
-/** @} end of group Method_ReuseMemory */
 
 /**
  * @defgroup BaseTesting
@@ -292,23 +469,31 @@ void compare_snprintf_ltoa_buffer(long *lvals, int len)
  */
 void print_with_ltoa_base(long value, int base)
 {
-   int len = ltoa(value, base, NULL, 0);
+   int len = ltoa_loop(value, base, NULL, 0);
    char *buffer = (char*)alloca(len);
    if (buffer)
    {
-      ltoa(value, base, buffer, len);
-      printf("For value %ld, base %d, we needed %d characters to output '%s'.\n",
-             value, base, len, buffer);
+      ltoa_loop(value, base, buffer, len);
+      printf("   base %2d, %2d chars for '%s'\n",
+             base, len, buffer);
    }
+}
+
+void test_the_value(long val)
+{
+   printf("Testing conversions for value %ld:\n", val);
+   print_with_ltoa_base(val, 10);
+   print_with_ltoa_base(val, 2);
+   print_with_ltoa_base(val, 8);
+   print_with_ltoa_base(val, 16);
+   print_with_ltoa_base(val, 36);
 }
 
 void test_with_base(void)
 {
-   print_with_ltoa_base(1000, 10);
-   print_with_ltoa_base(1000, 2);
-   print_with_ltoa_base(1000, 8);
-   print_with_ltoa_base(1000, 16);
-   print_with_ltoa_base(1000, 36);
+   test_the_value(1000);
+   test_the_value(LONG_MAX);
+   test_the_value(LONG_MIN);
 }
 
 /** @} end of BaseTesting */
@@ -329,7 +514,16 @@ void initialize_array_of_longs(long *longs, int len)
 
 int main(int argc, const char **argv)
 {
-   int sample_count = 1000;
+   printf("Size of long is %ld bytes, multiplied by 8 for bits in\n"
+          "a binary expression is %ld.  Then, add 1 for '\\0' and\n"
+          "one for possible negative for longest buffer requirement\n"
+          "of %ld.\n\n",
+          sizeof(long), sizeof(long)*8, 2+sizeof(long)*8);
+
+   test_with_base();
+   getchar();
+
+   int sample_count = 10000;
    if (argc > 1)
    {
       char *endptr;
@@ -343,12 +537,14 @@ int main(int argc, const char **argv)
    {
       initialize_array_of_longs(lvalues, sample_count);
 
-      // test_with_base();
-      printf("Running test with per-conversion buffer allocation.\n");
-      compare_snprintf_ltoa(lvalues, sample_count);
+      compare_conversion_strategies(lvalues, sample_count);
 
-      printf("\n\nRunning test with single, external buffer allocation.\n");
-      compare_snprintf_ltoa_buffer(lvalues, sample_count);
+      // // test_with_base();
+      // printf("Running test with per-conversion buffer allocation.\n");
+      // compare_snprintf_ltoa(lvalues, sample_count);
+
+      // printf("\n\nRunning test with single, external buffer allocation.\n");
+      // compare_snprintf_ltoa_buffer(lvalues, sample_count);
    }
 }
 
