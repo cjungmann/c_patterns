@@ -492,6 +492,7 @@ void test_the_value(long val)
 void test_with_base(void)
 {
    test_the_value(1000);
+   test_the_value(0);
    test_the_value(LONG_MAX);
    test_the_value(LONG_MIN);
 }
