@@ -14,8 +14,8 @@
  * @details
  *    Together, @ref ltoa and its supporting @ref ltoa_recursive_copy
  *    perform conversions from a long integer to a string value.  The
- *    number base can be specified from base-2 to base-36, with base
- *    specifiers outside of that range reverting to base-10.
+ *    #b radix argument can be specified from base-2 to base-36, with
+ *    radix specifiers outside of that range reverting to base-10.
  *
  *    No library functions are required to run these conversion
  *    functions.
@@ -31,20 +31,20 @@
  *    memory.
  * @param value    value from which the least significant digit will
  *                 be written as a number character.
- * @param base     number base in which the output will be written
+ * @param radix    number base in which the output will be written
  * @param ptr      pointer where the next number character should be
  *                 written
  * @param end      pointer to last permitted address for writing the
  *                 number variables.  The '\0' terminator will be
  *                 applied by the function that started the recursion.
  */
-void ltoa_recursive_copy(unsigned long value, int base, char **ptr, char *end)
+void ltoa_recursive_copy(unsigned long value, int radix, char **ptr, char *end)
 {
    if (value > 0)
    {
       // Recursion to reverse digits
-      int placeval = value % base;
-      ltoa_recursive_copy(value/base, base, ptr, end);
+      int placeval = value % radix;
+      ltoa_recursive_copy(value/radix, radix, ptr, end);
 
       if (*ptr < end)
       {
@@ -67,21 +67,21 @@ void ltoa_recursive_copy(unsigned long value, int base, char **ptr, char *end)
  *    create the long int translation.
  *
  * @param value    long value to convert to string
- * @param base     number base for conversion.  Allowed
+ * @param radix    number base for conversion.  Allowed
  *                 values from 2 to 36, using base 10
- *                 for an out-of-range @b base value.
+ *                 for an out-of-range @b radix value.
  * @param buffer   buffer to which the string will be written
  * @param bufflen  number of chars in @b buffer.
  *
  * @return Length of buffer needed to print the number.
  */
 int ltoa_recursive(long value,
-                   int base,
+                   int radix,
                    char *buffer,
                    int bufflen)
 {
-   if (base <= 0 || base > 36)
-      base = 10;
+   if (radix <= 0 || radix > 36)
+      radix = 10;
 
    unsigned long uvalue;
    int negative = 0;
@@ -104,22 +104,27 @@ int ltoa_recursive(long value,
       // Required length is the return value regardless
       // of buffer size (like snprintf)
       required_length = negative ? 2 : 1;
-      for (unsigned long lval = uvalue; lval > 0; lval /= base)
+      for (unsigned long lval = uvalue; lval > 0; lval /= radix)
          ++required_length;
    }
 
    // Bufflen must be at least 1 to contain the NULL terminator
    if (buffer && bufflen > 1)
    {
-      char *ptr = buffer;
-      // '-1' to save room for termating '\0':
-      char *end = buffer + bufflen - 1;
+      if (value==0)
+         memcpy(buffer, "0", 2);
+      else
+      {
+         char *ptr = buffer;
+         // '-1' to save room for termating '\0':
+         char *end = buffer + bufflen - 1;
 
-      if (negative)
-         *ptr++ = '-';
+         if (negative)
+            *ptr++ = '-';
 
-      ltoa_recursive_copy(uvalue, base, &ptr, end);
-      *ptr = '\0';
+         ltoa_recursive_copy(uvalue, radix, &ptr, end);
+         *ptr = '\0';
+      }
    }
 
    return required_length;
@@ -139,19 +144,19 @@ int ltoa_recursive(long value,
  *    provided by the first call.
  *
  * @param value    long value to be converted to a string
- * @param base     number base for conversion.  Allowed
+ * @param radix    number base for conversion.  Allowed
  *                 values from 2 to 36, using base 10
- *                 for an out-of-range @b base value.
+ *                 for an out-of-range @b radix value.
  * @param buffer   buffer to which output should be written
  * @param bufflen  length of @b buffer in bytes
  *
  * @return the number of characters needed to fully express
  *         the long @b value in the number @base specified
  */
-int ltoa_loop(long value, int base, char *buffer, int bufflen)
+int ltoa_loop(long value, int radix, char *buffer, int bufflen)
 {
-   if (base <= 0 || base > 36)
-      base = 10;
+   if (radix <= 0 || radix > 36)
+      radix = 10;
 
    unsigned long uvalue;
    int negative = 0;
@@ -174,48 +179,53 @@ int ltoa_loop(long value, int base, char *buffer, int bufflen)
       // Required length is the return value regardless
       // of buffer size (like snprintf)
       required_length = negative ? 2 : 1;
-      for (unsigned long lval = uvalue; lval > 0; lval /= base)
+      for (unsigned long lval = uvalue; lval > 0; lval /= radix)
          ++required_length;
    }
 
    // Bufflen must be at least 1 to contain the NULL terminator
    if (buffer && bufflen > 1)
    {
-      char work_digit;
-
-      // Prepare working memory and pointers into it
-      char *work_buffer = (char*)alloca(required_length);
-      char *ptr_digit = work_buffer + required_length-1;
-      *ptr_digit-- = '\0';
-
-      while (uvalue > 0)
+      if (value==0)
+         memcpy(buffer, "0", 2);
+      else
       {
-         // Since we've calculated exactly how many characters will be
-         // needed, this condition is redundant, assertion for safety:
-         assert(ptr_digit >= work_buffer);
+         char work_digit;
 
-         work_digit = uvalue % base;
-         if (work_digit < 10)
-            work_digit += '0';
-         else
-            work_digit += ('A' - 10);
+         // Prepare working memory and pointers into it
+         char *work_buffer = (char*)alloca(required_length);
+         char *ptr_digit = work_buffer + required_length-1;
+         *ptr_digit-- = '\0';
 
-         *ptr_digit = work_digit;
+         while (uvalue > 0)
+         {
+            // Since we've calculated exactly how many characters will be
+            // needed, this condition is redundant, assertion for safety:
+            assert(ptr_digit >= work_buffer);
 
-         --ptr_digit;
-         uvalue /= base;
+            work_digit = uvalue % radix;
+            if (work_digit < 10)
+               work_digit += '0';
+            else
+               work_digit += ('A' - 10);
+
+            *ptr_digit = work_digit;
+
+            --ptr_digit;
+            uvalue /= radix;
+         }
+
+         if (negative)
+         {
+            // Since we've calculated exactly how many characters will be
+            // needed, this condition is redundant, assertion for safety:
+            assert(ptr_digit >= work_buffer);
+
+            *ptr_digit-- = '-';
+         }
+
+         strncpy(buffer, work_buffer, bufflen);
       }
-
-      if (negative)
-      {
-         // Since we've calculated exactly how many characters will be
-         // needed, this condition is redundant, assertion for safety:
-         assert(ptr_digit >= work_buffer);
-
-         *ptr_digit-- = '-';
-      }
-
-      strncpy(buffer, work_buffer, bufflen);
    }
 
    return required_length;
@@ -238,14 +248,14 @@ int ltoa_loop(long value, int base, char *buffer, int bufflen)
  *    provide a buffer.
  *
  * @param value    long value to be converted to a string
- * @param base     number base for conversion.  Allowed
+ * @param radix    number base for conversion.  Allowed
  *                 values from 2 to 36, using base 10
- *                 for an out-of-range @b base value.
+ *                 for an out-of-range @b radix value.
  *
  * @return the number of characters needed to fully express
- *         the long @b value in the number @base specified
+ *         the long @b value in the number @b radix specified
  */
-const char *ltoa_instant(long value, int base)
+const char *ltoa_instant(long value, int radix)
 {
    // Maximum length calculated for binary expression with a
    // termination '\0' AND possibly a sign character for a
@@ -261,8 +271,8 @@ const char *ltoa_instant(long value, int base)
    // start of the converted string.
    char *cur_digit = buffend - 1;
 
-   if (base <= 0 || base > 36)
-      base = 10;
+   if (radix <= 0 || radix > 36)
+      radix = 10;
 
    if (value == 0)
       *cur_digit-- = '0';
@@ -279,14 +289,14 @@ const char *ltoa_instant(long value, int base)
       while (uvalue > 0)
       {
          assert(cur_digit >= buffer);
-         char cval = uvalue % base;
+         char cval = uvalue % radix;
          if (cval < 10)
             cval += '0';
          else
             cval += ('A' - 10);
 
          *cur_digit-- = cval;
-         uvalue /= base;
+         uvalue /= radix;
       }
 
       if (negative)
@@ -320,6 +330,7 @@ const char *ltoa_instant(long value, int base)
 #include <limits.h>
 #include <stdbool.h>
 #include <alloca.h>
+#include <locale.h>
 
 
 /**
@@ -385,7 +396,7 @@ void convert_with_ltoa_loop(long value)
 }
 
 /**
- * @brief Wrapper around long to string conversion function that uses a loop
+ * @brief Wrapper around long to string conversion function to static buffer
  * @param value   value to convert
  */
 void convert_with_ltoa_instant(long value)
@@ -393,6 +404,26 @@ void convert_with_ltoa_instant(long value)
    ltoa_instant(value, 10);
 }
 
+/**
+ * @brief Wrapper to use ltoa_instant to copy to new string buffer.
+ * @details
+ *    ltoa_instant overwrites a static buffer with each call, so
+ *    the result is transient.  ltoa_instant skips the steps of
+ *    predicting memory requirements and memory allocation needed
+ *    by the snprintf, ltoa_recursion, and ltoa_loop methods.
+ *
+ *    This wrapper measures, allocates, and copies the result of
+ *    ltoa_instant to fairly compare performance with the other
+ *    methods for non-transient results.
+ * @param value   value to convert
+ */
+void convert_with_ltoa_instant_copy(long value)
+{
+   const char *result = ltoa_instant(value, 10);
+   int len = strlen(result);
+   char *buff = (char*)alloca(len);
+   memcpy(buff, result, len);
+}
 /**
  * @brief Call the function pointer to execute the test
  * @details
@@ -429,6 +460,10 @@ void run_timed_test(const long *lvals, int vals_count, LPRINTER prntr)
    PT_clean(pt);
 }
 
+int COL_TITLE = 36;
+int COL_METHOD = 34;
+int COL_VALUE = 0;
+
 /**
  * @brief
  *    Calls each of the conversion timer functions with the same
@@ -438,25 +473,44 @@ void run_timed_test(const long *lvals, int vals_count, LPRINTER prntr)
  */
 void compare_conversion_strategies(long *lvals, int len)
 {
-   printf("\nTime %d conversions of various long values using "
-          "\033[32;1m%s\e[39;22m\n",
-          len, "ltoa_recursive");
+   char *old_locale = setlocale(LC_NUMERIC,NULL);
+   setlocale(LC_NUMERIC, "");
+
+   printf("\033[%d;1m"
+          "Display by-method timings for a set of "
+          "\033[%d;1m"
+          "%'d"
+          "\033[%d;1m"
+          " values"
+          "\e[39;22m\n",
+          COL_TITLE, COL_VALUE, len, COL_TITLE);
+
+   printf("\nConversion method \033[%d;1m%s\033[39;22m:\n",
+          COL_METHOD,
+          "snprintf");
+   run_timed_test(lvals, len, convert_with_snprintf);
+
+   printf("\nConversion method \033[%d;1m%s\033[39;22m:\n",
+          COL_METHOD,
+          "ltoa_recursive");
    run_timed_test(lvals, len, convert_with_ltoa_recursive);
 
-   printf("\nTime %d conversions of various long values using "
-          "\033[32;1m%s\e[39;22m\n",
-          len, "ltoa_loop");
+   printf("\nConversion method \033[%d;1m%s\033[39;22m:\n",
+          COL_METHOD,
+          "ltoa_loop");
    run_timed_test(lvals, len, convert_with_ltoa_loop);
 
-   printf("\nTime %d conversions of various long values using "
-          "\033[32;1m%s\e[39;22m\n",
-          len, "ltoa_instant");
+   printf("\nConversion method \033[%d;1m%s\033[39;22m:\n",
+          COL_METHOD,
+          "ltoa_instant");
    run_timed_test(lvals, len, convert_with_ltoa_instant);
 
-   printf("\nTime %d conversions of various long values using "
-          "\033[32;1m%s\e[39;22m\n",
-          len, "snprintf");
-   run_timed_test(lvals, len, convert_with_snprintf);
+   printf("\nConversion method \033[%d;1m%s\033[39;22m:\n",
+          COL_METHOD,
+          "ltoa_instant_copy");
+   run_timed_test(lvals, len, convert_with_ltoa_instant_copy);
+
+   setlocale(LC_NUMERIC, old_locale);
 }
 
 /** @} end of group Method_NewMemory */
@@ -464,32 +518,61 @@ void compare_conversion_strategies(long *lvals, int len)
 
 /**
  * @defgroup BaseTesting
- * @define Easily perform a battery of tests to confirm proper base handling.
+ * @define Easily perform a battery of tests to confirm proper radix handling.
  * @{
  */
-void print_with_ltoa_base(long value, int base)
+/**
+ * @brief
+ *    For the value and radix, print results for various methods.
+ * @details
+ *    Print results for recursive method, loop method, and instant
+ *    method for the given value, base arguments.
+ * @param value    value to convert to string
+ * @param radix    number base to use in conversion
+ */
+void print_with_ltoa_radix(long value, int radix)
 {
-   int len = ltoa_loop(value, base, NULL, 0);
-   char *buffer = (char*)alloca(len);
-   if (buffer)
+   int len = ltoa_loop(value, radix, NULL, 0);
+   char *recurse_buffer = (char*)alloca(len);
+   char *loop_buffer = (char*)alloca(len);
+   if (recurse_buffer && loop_buffer)
    {
-      ltoa_loop(value, base, buffer, len);
-      printf("   base %2d, %2d chars for '%s'\n",
-             base, len, buffer);
+      ltoa_recursive(value, radix, recurse_buffer, len);
+      ltoa_loop(value, radix, loop_buffer, len);
+
+      printf("   radix \033[34;1m%2d\033[39;22m required %2d chars, results by method\n"
+             "      recursion: %s\n"
+             "           loop: %s\n"
+             "        instant: %s\n",
+             radix, len,
+             recurse_buffer,
+             loop_buffer,
+             ltoa_instant(value, radix));
    }
 }
 
+/**
+ * @brief For given value, run test for representative bases.
+ * @param val   value to test
+ */
 void test_the_value(long val)
 {
-   printf("Testing conversions for value %ld:\n", val);
-   print_with_ltoa_base(val, 10);
-   print_with_ltoa_base(val, 2);
-   print_with_ltoa_base(val, 8);
-   print_with_ltoa_base(val, 16);
-   print_with_ltoa_base(val, 36);
+   printf("Testing conversions for value \033[33;1m%ld\033[39;22m:\n", val);
+   print_with_ltoa_radix(val, 10);
+   print_with_ltoa_radix(val, 2);
+   print_with_ltoa_radix(val, 8);
+   print_with_ltoa_radix(val, 16);
+   print_with_ltoa_radix(val, 36);
 }
 
-void test_with_base(void)
+/**
+ * @brief Run conversion tests of representative values
+ * @details
+ *    Test for typical value with 1000, then special cases
+ *    0, LONG_MAX, and LONG_MIN to confirm proper handling
+ *    at extreme values.
+ */
+void test_with_bases(void)
 {
    test_the_value(1000);
    test_the_value(0);
@@ -512,18 +595,18 @@ void initialize_array_of_longs(long *longs, int len)
       *longs = random();
 }
 
-
-int main(int argc, const char **argv)
+void display_max_buffer_explanation(void)
 {
+   printf("\033[1mExplain calculation of maximum required buffer size.\033[22m\n");
    printf("Size of long is %ld bytes, multiplied by 8 for bits in\n"
           "a binary expression is %ld.  Then, add 1 for '\\0' and\n"
           "one for possible negative for longest buffer requirement\n"
           "of %ld.\n\n",
           sizeof(long), sizeof(long)*8, 2+sizeof(long)*8);
+}
 
-   test_with_base();
-   getchar();
-
+void perform_timing_tests(int argc, const char **argv)
+{
    int sample_count = 10000;
    if (argc > 1)
    {
@@ -539,14 +622,22 @@ int main(int argc, const char **argv)
       initialize_array_of_longs(lvalues, sample_count);
 
       compare_conversion_strategies(lvalues, sample_count);
-
-      // // test_with_base();
-      // printf("Running test with per-conversion buffer allocation.\n");
-      // compare_snprintf_ltoa(lvalues, sample_count);
-
-      // printf("\n\nRunning test with single, external buffer allocation.\n");
-      // compare_snprintf_ltoa_buffer(lvalues, sample_count);
    }
+}
+
+
+int main(int argc, const char **argv)
+{
+   // printf("\033[H\033[2J");
+   // display_max_buffer_explanation();
+   // getchar();
+
+   // printf("\033[H\033[2J");
+   // test_with_bases();
+   // getchar();
+
+   printf("\033[H\033[2J");
+   perform_timing_tests(argc, argv);
 }
 
 /* Local Variables:                 */
