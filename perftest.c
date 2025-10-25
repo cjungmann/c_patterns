@@ -832,11 +832,6 @@ void generic_test_report(long *times, int times_count)
       double median = ai_calc_median(intervals, intervals_count);
       double sigma =  ai_calc_sigma(intervals, intervals_count);
 
-      printf("\nThis sample of "
-             "\033[32;1m%d\033[39;22m"
-             " intervals.\n",
-             intervals_count);
-
       printf("  range                %ld to %ld\n", minval, maxval);
       printf("  mean                 %f\n", mean);
       printf("  median               %f\n", median);
