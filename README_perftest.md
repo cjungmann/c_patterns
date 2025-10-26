@@ -1,6 +1,7 @@
 # PerfTest Module
 
-**PerfTest** is a performance testing module with a few goals:
+**PerfTest**, a part of [C-Patterns](README.md), is a performance
+testing module with a few goals:
 
 - **Time-stamp Recorder**  
   nominally, to measure performance of various algorithms to
