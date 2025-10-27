@@ -6,6 +6,14 @@
  * Using recursion to read from the end to the beginning
  * of the number to properly break into 1000s, then print
  * each 3-digit portion when the recursion unwinds.
+ *
+ * The same thing can be done with *setlocale* and *printf*
+ * using a format specifier with an apostrophe:
+ *
+ * char *oldloc = setlocale(LC_NUMERIC,NULL);
+ * setlocale(LC_NUMERIC, "");
+ * printf("Watch this: %'d.\n", 1000000);
+ * setlocale(LC_NUMERIC,oldloc);
  */
 void commaize_number(unsigned long num)
 {
