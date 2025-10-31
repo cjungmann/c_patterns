@@ -8,6 +8,15 @@
 #include <string.h>  // for strncpy
 #include <limits.h>  // for INT_MAX, SHRT_MAX, LONG_MAX, etc
 
+/*******************************************************
+ * Integer-type Settings
+ *
+ * Each of the following sets of 5 statements prepares
+ * the compilation environment to use a specific size of
+ * integer.  Only one of the sets should be active, with
+ * the others being commented-out.
+ *******************************************************/
+
 // typedef short ITYPE;
 // typedef unsigned short UITYPE;
 // #define TYPESPEC "%d"
@@ -656,9 +665,9 @@ void perform_timing_tests(int argc, const char **argv)
 
 int main(int argc, const char **argv)
 {
-   printf("\033[H\033[2J");
-   display_max_buffer_explanation();
-   getchar();
+   // printf("\033[H\033[2J");
+   // display_max_buffer_explanation();
+   // getchar();
 
    // printf("\033[H\033[2J");
    // test_with_bases();
