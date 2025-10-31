@@ -3,7 +3,6 @@
  * @brief Implementation of a ltoa() function with comparisons to other methods.
  */
 
-#include <alloca.h>
 #include <assert.h>
 #include <string.h>  // for strncpy
 #include <limits.h>  // for INT_MAX, SHRT_MAX, LONG_MAX, etc
@@ -227,7 +226,7 @@ int itoa_loop(ITYPE value, int radix, char *buffer, int bufflen)
          char work_digit;
 
          // Prepare working memory and pointers into it
-         char *work_buffer = (char*)alloca(required_length);
+         char work_buffer[required_length];
          char *ptr_digit = work_buffer + required_length-1;
          *ptr_digit-- = '\0';
 
