@@ -1,3 +1,5 @@
+<a id="readme_top" />
+
 # itoa
 
 Implementations of integer-to-string for fun and education
@@ -16,8 +18,8 @@ Implementations of integer-to-string for fun and education
     </li>
     <li><a href="#usage">Usage</a>
       <ul>
+        <li><a href="#as-copy-source">As Copy Source</a></li>
         <li><a href="#in-compiled-form">In Compiled Form</a></li>
-        <li><a href="#in-copied-form">In Copied Form</a></li>
       </ul>
     </li>
     <li><a href="#implementations">Implementations</a>
@@ -55,11 +57,15 @@ the [PerfTest](README_perftest.md) module.
 It may also be interesting to peruse the module's [source code](itoa.c)
 to learn about the various implementations.
 
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
+
 ## Getting Started
 
 There are multiple implementations of *itoa*.  You can compile the
 module and run the tests, or copy one of the implementations to your
 own project.
+
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
 
 ### Download
 
@@ -68,6 +74,8 @@ git clone https://www.github.com/cjungmann/c_patterns.git
 cd c_patterns
 ~~~
 
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
+
 ### Integer Size Setting
 
 While there is a data type named `integer`, this module can specify
@@ -75,6 +83,8 @@ different integer sizes from `char` to `long long`.  There is a
 section called **Integer-type Settings** near the top of the file
 where the integer type can be set.  Follow the instructions in the
 source file to change it.
+
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
 
 ### Compile
 
@@ -94,9 +104,33 @@ There are two ways to compile the module:
    cc -std=c99 -lm -o itoa itoa.c
    ```
 
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
+
 ## Usage
 
-### In compiled form
+The intended application of the module is to be a source from which
+one would copy one of multiple [implementations](#implementations)
+of **itoa** that it contains.  Look at
+[As Copy Source](#as-copy-source) below.
+
+That said, the module also contains code for comparing the
+performance of the various integer conversion methods.  The section
+[In Compiled Form](#in-compiled-form) how to compile the module and
+what you can expect to see.
+
+### As Copy Source
+
+Some care must be taken to copy an implementation to another
+project:
+
+1. At least one of the integer type settings must accompany any of
+   conversion implementations.
+2. Ensure the target source file includes *assert.h*, *string.h*,
+   and *limits.h*.
+3. To use **itoa_recursive**, you must also copy
+   **itoa_recursive_copy** to the target project.
+
+### In Compiled Form
 
 The compiled **itoa** program does the following:
 
@@ -116,20 +150,10 @@ array size can be specified by passing an integer value to the
 ```sh
 ./itoa 100000
 ```
-will create an integer array of 100,000 values.
+will create an integer array of 100,000 values instead of the default
+10,000 values.
 
-### In Copied Form
-
-Some care must be taken to copy an implementation to another
-project:
-
-1. At least one of the integer type settings must accompany any of
-   conversion implementations.
-2. Ensure the target source file includes *assert.h*, *string.h*,
-   and *limits.h*.
-3. To use **itoa_recursive**, you must also copy
-   **itoa_recursive_copy** to the target project.
-
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
 
 ## Implementations
 
@@ -140,6 +164,8 @@ work from the right side of the number in case you have to carry.
 Likewise, converting digits of of an integer must work from the
 least significant side of the value.  However, the numerals in the
 string are printed from most to least significant digits.
+
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
 
 ### Itoa Functions
 
@@ -181,6 +207,8 @@ the number being converted.
    the result into another string before recording the time
    interval.
 
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
+
 ## Testing
 
 In addition to comparing between the different implementations,
@@ -214,5 +242,6 @@ bases because **snprintf** is not capable of that feature.
    the memory and copies the string.  Even with this handicap, it
    is clearly more efficient than the other versions
 
+<p style="align-right"><a href="#readme_top">Back to top</a></p>
 
 [gcc]:    https://gcc.gnu.org/
