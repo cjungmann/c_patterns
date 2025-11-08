@@ -86,9 +86,42 @@ void pt_test_report(PerfTest *pt);
 /** @} ME_Reporter */
 
 
+/**
+ * @page INCLUDE_DEFS \
+ *       Explanation of include options
+ *
+ * There are five areas of code in this source file.  The base
+ * area is always loaded.  The other sections, activated with
+ * `#define ` statements, are described below.
+ *
+ * - **Base area**  
+ *   Defines the interface and generic functions that resolve
+ *   access to the member functions of an implementation.
+ *
+ * - **PT_INCLUDE_IMPLEMENTATIONS**  
+ *   Defining this macro will enable the working implementations
+ *   of the PerfTest interface.
+ *
+ * - **PT_INCLUDE_RESULTS_REPORT**  
+ *   Defining this macro will enable the reporting function that
+ *   uses an implementation to access timing data to print a
+ *   statistical report.
+ *
+ * - **PT_INCLUDE_TESTS**  
+ *   This macro will enable a section of code that defines an
+ *   execution function to test each of the builtin implementations,
+ *   and a function to calls and displays the result for each of the
+ *   execution functions.
+ *
+ * - **PERFTEST_MAIN**
+ *   When defined on the command line for a standalone compiling of
+ *   the source file, this macro enables the `main` function in
+ *   addition to all of the other macro-activated sections.
+ */
 
-
-
+#ifdef PERFTEST_MAIN
+#define PT_INCLUDE_ALL
+#endif
 
 #ifdef PT_INCLUDE_ALL
 #define PT_INCLUDE_TESTS
@@ -96,6 +129,9 @@ void pt_test_report(PerfTest *pt);
 
 #ifdef PT_INCLUDE_TESTS
 #define PT_INCLUDE_RESULTS_REPORT
+#endif
+
+#ifdef PT_INCLUDE_RESULTS_REPORT
 #define PT_INCLUDE_IMPLEMENTATIONS
 #endif
 
@@ -336,7 +372,7 @@ void PT_Gettime_cleaner(PerfTest *pt)
 bool PT_Gettime_adder(PerfTest *pt, void *data)
 {
    PT_Gettime *this = (PT_Gettime*)pt;
-   PT_GTLink *link = (PT_GTLink*)malloc(  PT_BLOCK_SIZE(*this));
+   PT_GTLink *link = (PT_GTLink*)malloc(PT_BLOCK_SIZE(*this));
    if (link)
    {
       // Get time ASAP
@@ -537,7 +573,7 @@ bool PT_Gettime_premem_adder(PerfTest *pt, void *data)
 
    PT_Gettime_premem *this = (PT_Gettime_premem*)pt;
 #ifdef PREMEM_SAFE
-   if (this->pool_next)
+   if (this->pool_next < this->pool_end)
    {
 #endif
       retval = true;
@@ -1130,7 +1166,7 @@ void print_description(const char *implementation,
           "\033[36;1m%s\e[39;22m"
           " sources "
           "\033[36;1m%s\e[39;22m"
-          ".\n",
+          ".\n\n",
           implementation,
           alloc_source,
           alloc_type,
@@ -1157,10 +1193,11 @@ int main(int argc, const char **argv)
 
    printf("\033[2J\033[H");
 
+   printf("Attempting to set highest process priority: ");
    if (setpriority(PRIO_PROCESS, 0, 19) == -1)
-      printf("Failed to set the priority, '%s'\n", strerror(errno));
+      printf("FAILED, '%s'\n\n", strerror(errno));
    else
-      printf("Set the highest available priority.\n");
+      printf("SUCCESS.\n\n");
 
    test_base(iterations);
    print_description("PT_Gettime", "heap", "internal", "individually", iterations, pause_between);
@@ -1195,7 +1232,6 @@ int main(int argc, const char **argv)
 /* compile-command: "gcc           \*/
 /*   -std=c99 -Wall -Werror -ggdb  \*/
 /*   -DPERFTEST_MAIN               \*/
-/*   -DPT_INCLUDE_ALL              \*/
 /*   -fsanitize=address            \*/
 /*   -lm                           \*/
 /*   -o perftest perftest.c"        */
