@@ -1,88 +1,4 @@
-/**
- * @file perftest_demo.c
- * @brief
- *    Companion source file for README_perftest.md
- * @details
- *    - Build an executable with the source file: @ref PerfTest_Demo_Compilation
- *    - View details about this demonstration source file: @ref PerfTest_Demo_Details
- */
-
-/**
- * @page PerfTest_Demo_id PerfTest_Demo: Usage Examples for Comprehension
- *
- * This source file contains several examples of how to use PerfTest.
- *
- * - @ref PerfTest_Demo_Details.
- * - @ref PerfTest_Demo_Compilation
- */
-
-
-/**
- * @page PerfTest_Demo_Compilation Learn How to Compile the Code
- *
- * @details
- *    There are two methods for building an executable from this
- *    source file:
- *    - In Emacs:  
- *      Run the `compile` command (M-x compile)
- *    - From the command line (without enabled warnings):
- *      Type:
- *      ```sh
- *      gcc -std=c99 -o perftest_demo perftest_demo.c -lm
- *      ```
- */
-
-
-/**
- * @page PerfTest_Demo_Details Detailed Description of PerfTest_Demo
- *
- * @details
- *    This source file contains demonstrations of five different
- *    implementations of the PerfTest interface.
- *
- *    With very minor variations in execution, each of the
- *    demonstrations
- *    1. declares and initializes an implementation
- *    2. takes the address of the instance to use with the interface
- *    3. executes the prescribed number of iterations of calling
- *       `sqrt` and using the interface to record the time of
- *       completion.
- *    4. prints a summary report of times to execute, including
- *       the range, mean, median, standard deviation
- *    5. by various methods, according to the needs of the specific
- *       implementation, frees up any allocated memory.
- *
- *    The first four demonstrations use builtin implementations of
- *    the PerfTest interface.  There are slight differences in setup
- *    and usage, especially around memory allocation.
- *
- *    - @ref demo_simple_timing
- *    - @ref demo_premem_timing
- *    - @ref demo_caller_stack_timing
- *    - @ref demo_caller_heap_timing
- *
- *
- *    The fifth PerfTest demonstration features a custom
- *    implementation that extends the base time-stamp data structure
- *    and overrides the clean-up and time-stamp member functions.
- *    The custom interface consists of several functions that are
- *    contained in a Doxygen group named `Custom_PerfTest`.  The
- *    custom interface is use in the following demonstration function:
- *
- *    - @ref demo_custom_perftest
- *
- *
- *    The `Custom_PerfTest` demonstration includes an additional
- *    report that manifests a custom method of extracting and using
- *    the collected data.  After the demonstration shows the builtin
- *    basic summary report, it calls the custom report to print info
- *    on each of the time stamps, highlighting perfect squares and
- *    outlier durations.  This additional report is generated with
- *    the help of:
- *
- *     - @ref demo_custom_report
- *     - @ref demo_calc_mean_and_sigma
- */
+/** @file perftest_demo.c */
 
 // define macros to enable parts of perftest.c
 #define PT_INCLUDE_IMPLEMENTATIONS
@@ -95,11 +11,20 @@
 /**
  * @brief No-frills Usage of PerfTest Interface
  * @details
- *    This demonstration showcases the most basic use case with the
- *    most basic implementation of the PerfTest interface.  Other
- *    implementations differ mainly in how memory is allocated for
- *    the time stamps, and the differences between the demonstration
- *    functions are connected to the different memory models.
+ *    Basic use involves these steps:
+ *    1. Declare and initialize a PerfTest implementation.
+ *    2. Declare a PerfTest interface pointer and assign to it the
+ *       address of the instance of the implementation.
+ *    3. Use the interface to add points, one just before the loop,
+ *       and then add points after each iteration.
+ *    4. Use the data (print a report)
+ *    5. Call `destructor` to free memory
+ *
+ *    The basic version allocates memory for each time point.
+ *
+ *    The other builtin versions differ mainly in how they
+ *    manage memory, attempting to reduce execution overhead
+ *    for more consistent and accurate timing.
  *
  * @param interations   number tasks to time
  */
@@ -128,14 +53,9 @@ void demo_simple_timing(int iterations)
 /**
  * @brief Demonstration of initializer-allocated memory pool implementation
  * @details
- *    The extra iterations argument in the init function  tells
- *    this PerfTest implementation how many time stamps will be
- *    recorded during the test.  This demonstration executes the
- *    tests and reports the timings in order to compare the
- *    performance of this memory strategy against the others.
- *
- *    This implementation differs from the others in that the
- *    init function allocates the memory.
+ *    This demonstration uses a PerfTest implementation that
+ *    pre-allocates a memory pool from which slices will be used to
+ *    save the time points.
  *
  * @param interations   number tasks to time
  */
@@ -335,8 +255,8 @@ void demo_calc_mean_and_sigma(const PT_GTInfo *info, double *mean, double *sigma
          time_end = GET_BILLS(current->time_point);
 
          interval = (double)(time_end - time_start);
-         total += (diff * diff);
          diff = interval - *mean;
+         total += (diff * diff);
 
          prev = prev->next;
       }
@@ -378,10 +298,14 @@ void demo_custom_report(const PT_GTInfo *pt_GTI)
 
       if (outlier)
          printf("\033[38;2;255;64;128m");
-      if (perfect)
-         printf("\033[48;2;64;128;64;1m");
 
-      printf("%3d: %4.8f   (%ld)", current->data.value, current->data.root, interval);
+      if (perfect)
+      {
+         printf("\033[48;2;64;128;64;1m");
+         printf("%5d: %10ld   (%ld)", current->data.value, (long)round(current->data.root), interval);
+      }
+      else
+         printf("%5d: %10f   (%ld)", current->data.value, current->data.root, interval);
 
       if (outlier || perfect)
          printf("\033[39;49;22m");
@@ -506,26 +430,103 @@ int main(int argc, const char **argv)
 
    demo_simple_timing(iterations);
 
-   printf("Press any key for the next test.\n");
+   printf("Press ENTER for the next test.\n");
    getchar();
 
    demo_premem_timing(iterations);
 
-   printf("Press any key for the next test.\n");
+   printf("Press ENTER for the next test.\n");
    getchar();
 
    demo_caller_heap_timing(iterations);
 
-   printf("Press any key for the next test.\n");
+   printf("Press ENTER for the next test.\n");
    getchar();
 
    demo_caller_stack_timing(iterations);
 
-   printf("Press any key for the next test.\n");
+   printf("Press ENTER for the next test.\n");
    getchar();
    demo_custom_perftest(iterations);
 }
 
+
+/**
+ * @page PerfTest_Demo_id PerfTest_Demo: Usage Examples for Comprehension
+ *
+ * This source file contains several examples of how to use PerfTest.
+ *
+ * - @ref PerfTest_Demo_Details.
+ * - @ref PerfTest_Demo_Compilation
+ */
+
+
+/**
+ * @page PerfTest_Demo_Compilation Learn How to Compile the Code
+ *
+ * @details
+ *    There are two methods for building an executable from this
+ *    source file:
+ *    - In Emacs:  
+ *      Run the `compile` command (M-x compile)
+ *    - From the command line (without enabled warnings):  
+ *      Type:
+ *      ```sh
+ *      gcc -std=c99 -o perftest_demo perftest_demo.c -lm
+ *      ```
+ */
+
+
+/**
+ * @page PerfTest_Demo_Details Detailed Description of PerfTest_Demo
+ *
+ * @details
+ *    This source file contains demonstrations of five different
+ *    implementations of the PerfTest interface.
+ *
+ *    With very minor variations in execution, each of the
+ *    demonstrations
+ *    1. declares and initializes an implementation
+ *    2. takes the address of the instance to use with the interface
+ *    3. executes the prescribed number of iterations of calling
+ *       `sqrt` and using the interface to record the time of
+ *       completion.
+ *    4. prints a summary report of times to execute, including
+ *       the range, mean, median, standard deviation
+ *    5. by various methods, according to the needs of the specific
+ *       implementation, frees up any allocated memory.
+ *
+ *    The first four demonstrations use builtin implementations of
+ *    the PerfTest interface.  There are slight differences in setup
+ *    and usage, especially around memory allocation.
+ *
+ *    - @ref demo_simple_timing
+ *    - @ref demo_premem_timing
+ *    - @ref demo_caller_stack_timing
+ *    - @ref demo_caller_heap_timing
+ *
+ *
+ *    The fifth PerfTest demonstration features a custom
+ *    implementation that extends the base time-stamp data structure
+ *    and overrides the clean-up and time-stamp member functions.
+ *    The custom interface consists of several functions that are
+ *    contained in a Doxygen group named `Custom_PerfTest`.  The
+ *    custom interface is use in the following demonstration function:
+ *
+ *    - @ref demo_custom_perftest
+ *
+ *
+ *    The `Custom_PerfTest` demonstration includes an additional
+ *    report that manifests a custom method of extracting and using
+ *    the collected data.  After the demonstration shows the builtin
+ *    basic summary report, it calls the custom report to print info
+ *    on each of the time stamps, highlighting perfect squares and
+ *    outlier durations.  This additional report is generated with
+ *    the help of:
+ *
+ *     - @ref demo_custom_report
+ *     - @ref demo_calc_mean_and_sigma
+ */
 
 
 /* Local Variables:                 */
