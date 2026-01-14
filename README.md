@@ -51,6 +51,12 @@ programming challenges.
                <b>init_struct_array</b>:
                very old file, when I was younger and ignorant
             </a></li>
+            <li><a href="isJsonNumber">
+               <b>isJSonNumber</b>:
+               Quick-and-dirty solution that evaluates if a string
+               is a valid JSON number.  Developed for a JSON parsing
+               project.
+            </a></li>
          </ul>
       </li>
    </ul>
@@ -145,4 +151,10 @@ organizing, etc.
   etc.  I frequently have trouble initializing these arrays.
   This guide should help me remember effective coding
   techniques.
+
+- <span id="isJsonNumber" />[isJsonNumber](README_isJsonNumber.md)
+  Quickly developed code to support JSON parsing.  Follows
+  standards set out by [RFC-8259](https://datatracker.ietf.org/doc/html/rfc8259)
+  and passes number parsing tests found
+  in [Parsing JSON is a Minefield](https://seriot.ch/software/parsing_json.html).
 
