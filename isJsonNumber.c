@@ -1,10 +1,11 @@
 #include <stdbool.h>
 #include <ctype.h>    // for isdigit()
 
-bool isJsonNumber(const char *str)
+bool isJsonNumber(const char *str, bool *isFloatReturn)
 {
    bool retval = false;
 
+   bool is_float = false;
    bool has_numerals = false;
    bool has_decimal = false;
    bool is_exponent = false;
@@ -37,7 +38,7 @@ bool isJsonNumber(const char *str)
          else if (has_decimal || is_exponent)
             goto early_exit;
          else
-            has_decimal = true;
+            has_decimal = is_float = true;
       }
       else if (*ptr=='e' || *ptr=='E')
       {
@@ -53,7 +54,7 @@ bool isJsonNumber(const char *str)
          if (*(ptr+1) == '-' || *(ptr+1) == '+')
             ++ptr;
 
-         is_exponent = true;
+         is_exponent = is_float= true;
 
          // Clear flag to require numerals after the E:
          has_numerals = false;
@@ -71,6 +72,14 @@ bool isJsonNumber(const char *str)
    retval = has_numerals && (first_numeral!='0' || is_exponent || has_decimal);
 
   early_exit:
+   if (isFloatReturn)
+   {
+      if (retval && is_float)
+         *isFloatReturn = true;
+      else
+         *isFloatReturn = false;
+   }
+
    return retval;
 }
 
@@ -84,8 +93,12 @@ bool isJsonNumber(const char *str)
 
 void run_test(const char *str)
 {
-   if (isJsonNumber(str))
-      printf("\"\033[32;1m%s\033[39;22m\" IS a number!\n", str);
+   bool isFloat;
+   if (isJsonNumber(str, &isFloat))
+   {
+      printf("\"\033[32;1m%s\033[39;22m\" IS \033[32;1m%s\033[39;22m number!\n",
+             str, (isFloat?"a floating":"an integer") );
+   }
    else
       printf("\"\033[31;1m%s\033[39;22m\" IS NOT a number!\n", str);
 }
