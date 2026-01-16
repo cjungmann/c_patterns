@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <ctype.h>    // for isdigit()
+#include <stddef.h>   // for NULL
 
 bool isJsonNumber(const char *str, bool *isFloatReturn)
 {
@@ -11,7 +12,7 @@ bool isJsonNumber(const char *str, bool *isFloatReturn)
    bool is_exponent = false;
 
    const char *ptr = str;
-   int first_numeral = '\0';
+   const char *first_numeral = NULL;
 
    // Leading sign is permitted and skipped if found:
    if (*ptr == '-' || *ptr == '+')
@@ -25,8 +26,8 @@ bool isJsonNumber(const char *str, bool *isFloatReturn)
       {
          has_numerals = true;
          // Save first numeral for later check for forbidden initial '0'
-         if (first_numeral ==  '\0')
-            first_numeral = *ptr;
+         if (first_numeral == NULL)
+            first_numeral = ptr;
       }
       else if (*ptr == '.')
       {
@@ -69,7 +70,11 @@ bool isJsonNumber(const char *str, bool *isFloatReturn)
    }
 
    // It's only a number if several factors line up:
-   retval = has_numerals && (first_numeral!='0' || is_exponent || has_decimal);
+   retval = has_numerals &&
+      (*first_numeral != '0'             // leading 0 is invalid UNLESS
+       || *(first_numeral+1)=='\0'       // it's also the last numeral
+       || is_exponent                    // coefficient of 0 OK (ie 0e0 is valid)
+       || has_decimal);                  // leading 0 ok for mixed number (ie 0.1234)
 
   early_exit:
    if (isFloatReturn)
