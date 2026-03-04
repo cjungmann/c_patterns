@@ -24,6 +24,10 @@ programming challenges.
                <b>itoa</b>:
                yet more implementations of integer to string
             </a></li>
+            <li><a href="#sarray">
+                <b>sarray</b>:
+                create a packed array of strings
+             </a></li>
             <li><a href="#perftest">
                 <b>PerfTest</b>:
                 records and reports on iterative timings
@@ -112,6 +116,11 @@ organizing, etc.
   testing code that uses *snprintf* as a benchmark for speed
   and output.  It also uses [PerfTest][README_perftest.md) to
   compare the performance of the different versions.
+
+- <span id="sarray" />[String Array](README_sarray.md)
+  Called *sarray*, this module packs a memory block with strings
+  and an array of pointers to the contained strings.  It also
+  aspires to be a good example of Doxygen documentation.
 
 - <span id="perftest" />[Performance Tester](README_perftest.md)  
   While considering the value of my new *itoa* function, it
