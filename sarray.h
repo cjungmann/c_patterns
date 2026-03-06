@@ -16,7 +16,7 @@
  * access by heeding the limit set by the @p count member.
  */
 struct sarray_handle {
-   int        count;      ///< number of strings in array
+   unsigned   count;      ///< number of strings in array
    const char **strings;  ///< array of string pointers
 };
 
@@ -79,6 +79,8 @@ void sarray_build(sarray_handle *handle,
                   walker_func func,
                   char *buffer,
                   int bufflen);
+
+const char *sarray_element_by_index(sarray_handle *handle, unsigned index);
 
 
 

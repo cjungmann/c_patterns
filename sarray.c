@@ -86,6 +86,23 @@ void sarray_build(sarray_handle *handle,
    (*func)(string, sarray_handle_add_string, &sf);
 }
 
+/**
+ * @brief Convenient function safely returning a string from the string array.
+ *
+ * Returns a NULL if the index is out-of-range, so it's a quick
+ * and safe way to access contents by incorporating a test along
+ * with the access.
+ * @param handle    handle of string array to search
+ * @param index     0-based index into the array
+ * @return Requested element if in range, NULL if not in range
+ */
+const char *sarray_element_by_index(sarray_handle *handle, unsigned index)
+{
+   if (index < handle->count)
+      return handle->strings[index];
+   else
+      return NULL;
+}
 
 #ifdef SARRAY_MAIN
 
